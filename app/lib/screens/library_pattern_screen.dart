@@ -79,6 +79,31 @@ class _LibraryPatternScreenState extends State<LibraryPatternScreen> {
     if (name != null && name.isNotEmpty) await save(name);
   }
 
+  /// Starts a project kept on this phone, linked to this pattern, and opens
+  /// the pattern for it.
+  Future<void> _startProject(LibraryPattern pattern) async {
+    final name = TextEditingController(text: pattern.title);
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('New project'),
+        content: TextField(
+          controller: name,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(labelText: 'Project name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, name.text.trim()), child: const Text('Start')),
+        ],
+      ),
+    );
+    if (chosen == null || chosen.isEmpty) return;
+    final id = await widget.session.createProject(name: chosen, patternKey: pattern.key);
+    if (mounted) _read(pattern, projectId: id);
+  }
+
   void _read(LibraryPattern pattern, {PatternFile? file, int? projectId}) {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ReaderScreen(session: widget.session, pattern: pattern, startFileId: file?.id, projectId: projectId),
@@ -125,12 +150,19 @@ class _LibraryPatternScreenState extends State<LibraryPatternScreen> {
           Semantics(header: true, child: Text(pattern.title, style: Theme.of(context).textTheme.headlineMedium)),
           if (pattern.author != null) Text(pattern.author!, style: const TextStyle(color: PurlnoteColors.plumMuted)),
           const SizedBox(height: 20),
-          if (pattern.isOnPhone)
+          if (pattern.isOnPhone) ...[
             FilledButton.icon(
               onPressed: () => _read(pattern),
               icon: const Icon(Icons.menu_book_outlined),
               label: const Text('Read'),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _startProject(pattern),
+              icon: const Icon(Icons.add),
+              label: const Text('Start a project with this pattern'),
+            ),
+          ],
           if (needsPermission) ...[
             const SizedBox(height: 12),
             _PermissionCard(onAllow: _allowDownloads),

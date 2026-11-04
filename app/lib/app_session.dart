@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'auth/auth_service.dart';
 import 'data/local_database.dart';
+import 'data/local_projects.dart';
 import 'data/outbox.dart';
 import 'data/pending_edit.dart';
 import 'data/sync_engine.dart';
@@ -50,9 +51,19 @@ class AppSession extends ChangeNotifier {
     StepBuilder? stepBuilder,
   })  : library = LibraryStore(database),
         reader = ReaderStore(database),
-        steps = StepsStore(database) {
+        steps = StepsStore(database),
+        localProjects = LocalProjects(database) {
     this.stepBuilder = stepBuilder ?? StepBuilder(store: steps);
   }
+
+  /// Projects kept on this phone only.
+  final LocalProjects localProjects;
+
+  /// Whether a Ravelry account is connected. Purlnote works fully without
+  /// one; an account adds projects, stash and purchases from Ravelry.
+  bool connected = false;
+
+  static const _withoutRavelrySetting = 'use_without_ravelry';
 
   /// Step-by-step instructions made from each PDF.
   final StepsStore steps;
@@ -109,9 +120,15 @@ class AppSession extends ChangeNotifier {
   /// Decides where to start when the app opens.
   Future<void> start() async {
     if (!await auth.isSignedIn()) {
-      _moveTo(AppStage.signedOut);
+      if (await database.setting(_withoutRavelrySetting) == 'true') {
+        await _loadFromDatabase();
+        _moveTo(AppStage.ready);
+      } else {
+        _moveTo(AppStage.signedOut);
+      }
       return;
     }
+    connected = true;
     await _loadFromDatabase();
     if (user == null) {
       // Signed in, but the first sync never finished.
@@ -120,6 +137,14 @@ class AppSession extends ChangeNotifier {
       _moveTo(AppStage.ready);
       await refresh();
     }
+  }
+
+  /// Starts using Purlnote with everything kept on this phone. A Ravelry
+  /// account can be connected later from You.
+  Future<void> startWithoutRavelry() async {
+    await database.saveSetting(_withoutRavelrySetting, 'true');
+    await _loadFromDatabase();
+    _moveTo(AppStage.ready);
   }
 
   /// Opens Ravelry's sign-in, then copies the knitter's records.
@@ -135,6 +160,7 @@ class AppSession extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    connected = true;
     await _runFirstSync();
   }
 
@@ -167,7 +193,8 @@ class AppSession extends ChangeNotifier {
   Future<void> refresh() => _sync();
 
   Future<void> _sync({SyncProgress? onProgress}) async {
-    if (isSyncing) return;
+    // Without a Ravelry account there is nothing to sync.
+    if (isSyncing || !connected) return;
     isSyncing = true;
     syncProblem = null;
     notifyListeners();
@@ -197,21 +224,36 @@ class AppSession extends ChangeNotifier {
 
   /// Forgets the Ravelry sign-in, the copied records and any unsent edits on
   /// this phone. The Ravelry records come back on the next sign-in.
+  ///
+  /// Purlnote keeps working afterwards with what's on the phone: phone-only
+  /// projects, PDFs, notes and counters stay.
   Future<void> signOut() async {
     await auth.signOut();
     await pdfAuth?.signOut();
     await database.clearRavelryData();
+    await database.saveSetting(_withoutRavelrySetting, 'true');
+    connected = false;
     await _loadFromDatabase();
-    _moveTo(AppStage.signedOut);
+    _moveTo(AppStage.ready);
   }
 
   Future<void> _loadFromDatabase() async {
     final users = await database.records(RecordType.user);
     user = users.isEmpty ? null : RavelryUser.fromJson(users.first);
-    projects = (await database.records(RecordType.project)).map(Project.fromJson).toList();
+    projects = [
+      ...(await database.records(RecordType.project)).map(Project.fromJson),
+      ...(await localProjects.all()).map(Project.fromJson),
+    ];
     queue = (await database.records(RecordType.queuedProject)).map(QueuedProject.fromJson).toList();
     stash = (await database.records(RecordType.stash)).map(StashYarn.fromJson).toList();
     projectStatuses = (await database.records(RecordType.projectStatus)).map(ProjectStatus.fromJson).toList();
+    if (projectStatuses.isEmpty) {
+      // Not synced from Ravelry (yet): offer the common statuses by name.
+      projectStatuses = [
+        for (var i = 0; i < LocalProjects.statusNames.length; i++)
+          ProjectStatus(id: i + 1, name: LocalProjects.statusNames[i]),
+      ];
+    }
     pendingEdits = await database.pendingEdits();
     lastSyncedAt = await database.lastSyncedAt();
     patterns = await library.patterns();
@@ -237,6 +279,7 @@ class AppSession extends ChangeNotifier {
   /// Loads a project's or yarn's full details (notes, size and so on) before
   /// showing or editing it. Offline, the stored copy is used as it is.
   Future<void> loadFullRecord(RecordType type, int ravelryId) async {
+    if (!connected || LocalProjects.isLocal(ravelryId)) return;
     try {
       await sync.refreshRecord(type, ravelryId);
     } on RavelryUnreachable {
@@ -261,6 +304,13 @@ class AppSession extends ChangeNotifier {
     Map<String, Object?> displayFields = const {},
   }) async {
     if (changes.isEmpty) return;
+    if (type == RecordType.project && LocalProjects.isLocal(ravelryId)) {
+      // A phone-only project is simply saved; there's nothing to send.
+      await localProjects.update(ravelryId, {...changes, ...displayFields});
+      await _loadFromDatabase();
+      notifyListeners();
+      return;
+    }
     await outbox.saveEdit(type: type, ravelryId: ravelryId, changes: changes, displayFields: displayFields);
     await _loadFromDatabase();
     notifyListeners();
@@ -394,6 +444,58 @@ class AppSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Phone-only projects -----------------------------------------------------
+
+  /// Starts a project on this phone, optionally with a pattern from the
+  /// library. Returns its ID.
+  Future<int> createProject({required String name, String? patternKey}) async {
+    final pattern = patternKey == null ? null : patternByKey(patternKey);
+    final id = await localProjects.create(name: name, patternName: pattern?.title);
+    if (patternKey != null) await library.linkProject(id, patternKey);
+    await _loadFromDatabase();
+    notifyListeners();
+    return id;
+  }
+
+  Future<void> deleteLocalProject(int projectId) async {
+    await localProjects.delete(projectId);
+    await _loadFromDatabase();
+    notifyListeners();
+  }
+
+  /// Creates a phone-only project on Ravelry and moves its counters, reading
+  /// spots and steps over. Returns a message to show if it couldn't.
+  Future<String?> addProjectToRavelry(int projectId) async {
+    final username = user?.username;
+    final project = await localProjects.byId(projectId);
+    if (!connected || username == null || project == null) return 'Connect a Ravelry account first.';
+    final statusId =
+        projectStatuses.where((status) => status.name == project['status_name']).firstOrNull?.id;
+    try {
+      final reply = await sync.ravelry.post('/projects/${Uri.encodeComponent(username)}/create.json', {
+        'name': project['name'],
+        if (project['pattern_name'] != null) 'personal_pattern_name': project['pattern_name'],
+        if (statusId != null) 'project_status_id': statusId,
+        if (project['progress'] != null) 'progress': project['progress'],
+        if (project['started'] != null) 'started': project['started'],
+        if (project['completed'] != null) 'completed': project['completed'],
+        if (project['size'] != null) 'size': project['size'],
+        if (project['notes'] != null) 'notes': project['notes'],
+      });
+      final ravelryId = (reply['project'] as Map<String, dynamic>?)?['id'] as int?;
+      if (ravelryId == null) return 'Ravelry didn\'t confirm the new project.';
+      await localProjects.moveTo(projectId, ravelryId);
+    } on RavelryUnreachable {
+      return 'You\'re offline. Add it to Ravelry when you\'re connected.';
+    } on RavelryError catch (error) {
+      return 'Ravelry couldn\'t create the project (error ${error.statusCode}).';
+    }
+    await refresh();
+    await _loadFromDatabase();
+    notifyListeners();
+    return null;
+  }
+
   // Notes to projects ------------------------------------------------------
 
   /// Where new notes for [projectId] go: the last choice made for that
@@ -449,6 +551,7 @@ class AppSession extends ChangeNotifier {
 
   /// Comments on a project from Ravelry, or null when offline.
   Future<List<RavelryComment>?> loadComments(int projectId) async {
+    if (!connected || LocalProjects.isLocal(projectId)) return null;
     final username = user?.username;
     final service = comments;
     if (username == null || service == null) return null;
@@ -489,7 +592,10 @@ class AppSession extends ChangeNotifier {
 
   // Notes backup -------------------------------------------------------------
 
-  Future<bool> isBackupEnabled() async => await backup?.isEnabled() ?? false;
+  Future<bool> isBackupEnabled() async => connected && (await backup?.isEnabled() ?? false);
+
+  /// Whether notes on a project can go to its Ravelry comments.
+  bool canCommentOn(int projectId) => connected && !LocalProjects.isLocal(projectId);
 
   /// Turning the backup off deletes it from Ravelry. Returns a message to
   /// show if that couldn't be done now.

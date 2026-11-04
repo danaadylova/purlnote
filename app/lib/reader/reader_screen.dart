@@ -11,6 +11,7 @@ import 'awake_timer.dart';
 import 'counters_bar.dart';
 import 'page_marks.dart';
 import 'reader_store.dart';
+import 'row_ruler.dart';
 
 /// The pattern reader: a pattern's PDFs with the knitter's marks on top,
 /// the project's counters underneath, and the screen kept awake.
@@ -57,10 +58,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
   List<Annotation> _marks = const [];
   List<ProjectCounter> _counters = const [];
   ReaderTool _tool = ReaderTool.none;
-  bool _rulerOn = false;
-
-  /// Where the row ruler sits, as a fraction of the reading area's height.
-  double _rulerAt = 0.4;
+  /// The row ruler, if it has been used in this file.
+  RulerPosition? _ruler;
   bool _loading = true;
 
   /// Showing the Steps view instead of the PDF page.
@@ -100,11 +99,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _showFile(PatternFile file, {int? page}) async {
     final savedPage = page ?? await _store.savedPage(file.id, projectId: _projectId);
     final marks = await _store.annotationsFor(file.sha256!);
+    final ruler = await _store.savedRuler(file.id, projectId: _projectId);
     setState(() {
       _file = file;
       _startPage = savedPage ?? 1;
       _page = _startPage;
       _marks = marks;
+      _ruler = ruler;
     });
     if (savedPage != null && page == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +158,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       projectName: projectId == null ? null : widget.session.projectById(projectId)?.name,
       initialDestination: lastDestination,
       tag: tag.text,
+      allowComments: projectId != null && widget.session.canCommentOn(projectId),
     );
     if (result == null) return;
 
@@ -328,6 +330,35 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  // Row ruler ----------------------------------------------------------------
+
+  /// Turns the ruler on (where it was left, or on the current page) or off.
+  void _toggleRuler() {
+    final ruler = _ruler;
+    _saveRuler(ruler == null ? RulerPosition.startOn(_page ?? 1) : ruler.copyWith(visible: !ruler.visible));
+  }
+
+  /// One small step up (-1) or down (1). Crossing onto another page scrolls
+  /// there, so the ruler stays in view.
+  void _moveRuler(int direction) {
+    final ruler = _ruler;
+    if (ruler == null) return;
+    final pageCount = _viewer.isReady ? _viewer.pageCount : ruler.page;
+    final moved = ruler.movedBy(direction * ruler.step, pageCount: pageCount);
+    if (moved.page != ruler.page && _viewer.isReady) _viewer.goToPage(pageNumber: moved.page);
+    _saveRuler(moved);
+  }
+
+  void _resizeRuler(int direction) {
+    final ruler = _ruler;
+    if (ruler != null) _saveRuler(ruler.resizedBy(direction * 0.005));
+  }
+
+  void _saveRuler(RulerPosition ruler) {
+    setState(() => _ruler = ruler);
+    _store.saveRuler(_file!.id, ruler, projectId: _projectId);
+  }
+
   // Counters and screen awake ------------------------------------------------
 
   Future<void> _setRows(int rows) async {
@@ -422,17 +453,18 @@ class _ReaderScreenState extends State<ReaderScreen> {
                         )
                       else ...[
                         Expanded(child: _buildPages(file)),
+                        if (_ruler?.visible == true) RulerControls(onMove: _moveRuler, onResize: _resizeRuler),
                         _Toolbar(
-                        tool: _tool,
-                        rulerOn: _rulerOn,
-                        onTool: (tool) => setState(() {
-                          if (tool == ReaderTool.ruler) {
-                            _rulerOn = !_rulerOn;
-                          } else {
-                            _tool = _tool == tool ? ReaderTool.none : tool;
-                          }
-                        }),
-                      ),
+                          tool: _tool,
+                          rulerOn: _ruler?.visible == true,
+                          onTool: (tool) {
+                            if (tool == ReaderTool.ruler) {
+                              _toggleRuler();
+                            } else {
+                              setState(() => _tool = _tool == tool ? ReaderTool.none : tool);
+                            }
+                          },
+                        ),
                       ],
                       if (_counters.isNotEmpty)
                         Container(
@@ -471,6 +503,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 scaleEnabled: !_tool.drawsOnPage,
                 onPageChanged: _pageChanged,
                 pageOverlaysBuilder: (context, pageRect, page) => [
+                  if (_ruler?.visible == true) RulerOverlay(ruler: _ruler!, page: page.pageNumber),
                   PageMarks(
                     page: page.pageNumber,
                     marks: _marks.where((mark) => mark.page == page.pageNumber).toList(),
@@ -483,14 +516,6 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ],
               ),
             ),
-            if (_rulerOn)
-              _RowRuler(
-                top: _rulerAt * constraints.maxHeight,
-                height: constraints.maxHeight,
-                onMoved: (dy) => setState(() {
-                  _rulerAt = ((_rulerAt * constraints.maxHeight + dy) / constraints.maxHeight).clamp(0.0, 0.95);
-                }),
-              ),
           ],
         );
       },
@@ -623,53 +648,6 @@ class _ToolButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// A band across the page that dims everything but the current row. Drag it
-/// up or down.
-class _RowRuler extends StatelessWidget {
-  const _RowRuler({required this.top, required this.height, required this.onMoved});
-
-  final double top;
-  final double height;
-  final ValueChanged<double> onMoved;
-
-  static const bandHeight = 40.0;
-  static const _dim = Color(0x66FFF8EE);
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(top: 0, left: 0, right: 0, height: top, child: const IgnorePointer(child: ColoredBox(color: _dim))),
-        Positioned(
-          top: top + bandHeight,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: const IgnorePointer(child: ColoredBox(color: _dim)),
-        ),
-        Positioned(
-          top: top,
-          left: 0,
-          right: 0,
-          height: bandHeight,
-          child: Semantics(
-            label: 'Row ruler. Drag up or down.',
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onVerticalDragUpdate: (details) => onMoved(details.delta.dy),
-              child: Container(
-                decoration: const BoxDecoration(
-                  border: Border.symmetric(horizontal: BorderSide(color: PurlnoteColors.marigoldDark, width: 2)),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

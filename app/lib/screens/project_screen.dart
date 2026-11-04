@@ -89,9 +89,15 @@ class _ProjectDetails extends StatelessWidget {
           ProjectPhoto(url: project.photoUrl, size: 120),
           const SizedBox(height: 16),
           Semantics(header: true, child: Text(project.name, style: text.headlineMedium)),
-          if (status != null) ...[
+          if (status != null || project.isOnPhoneOnly) ...[
             const SizedBox(height: 8),
-            Align(alignment: Alignment.centerLeft, child: StatusChip(status: status)),
+            Wrap(
+              spacing: 8,
+              children: [
+                if (status != null) StatusChip(status: status),
+                if (project.isOnPhoneOnly) const StatusChip(status: 'On this phone'),
+              ],
+            ),
           ],
           if (progress != null) ...[
             const SizedBox(height: 20),
@@ -112,7 +118,8 @@ class _ProjectDetails extends StatelessWidget {
             Text(project.notes!, style: const TextStyle(fontSize: 16, height: 1.45)),
           ],
           const SizedBox(height: 24),
-          _CommentsSection(session: session, project: project),
+          if (session.canCommentOn(project.id)) _CommentsSection(session: session, project: project),
+          if (project.isOnPhoneOnly) _PhoneOnlyActions(session: session, project: project),
         ],
       ),
     );
@@ -375,6 +382,58 @@ class _CommentTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// For a project kept on this phone: add it to Ravelry (when an account is
+/// connected), or delete it.
+class _PhoneOnlyActions extends StatelessWidget {
+  const _PhoneOnlyActions({required this.session, required this.project});
+
+  final AppSession session;
+  final Project project;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (session.connected)
+          OutlinedButton.icon(
+            onPressed: () async {
+              final problem = await session.addProjectToRavelry(project.id);
+              if (!context.mounted) return;
+              if (problem != null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
+            icon: const Icon(Icons.cloud_upload_outlined),
+            label: const Text('Add this project to Ravelry'),
+          ),
+        TextButton.icon(
+          onPressed: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Delete this project?'),
+                content: const Text('Its counters and place in the pattern are removed. The pattern PDF and its notes stay.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                  TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                ],
+              ),
+            );
+            if (confirmed != true || !context.mounted) return;
+            Navigator.of(context).pop();
+            await session.deleteLocalProject(project.id);
+          },
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Delete project'),
+        ),
+      ],
     );
   }
 }

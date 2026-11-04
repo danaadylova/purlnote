@@ -24,7 +24,7 @@ class LocalDatabase {
   final Database _db;
 
   static const _fileName = 'purlnote.db';
-  static const _version = 5;
+  static const _version = 7;
 
   /// Opens (and if needed creates) the database.
   ///
@@ -42,12 +42,16 @@ class LocalDatabase {
           await _addPatternsAndReading(db);
           await _addCommentsAndSettings(db);
           await _addSteps(db);
+          await _addLocalProjects(db);
+          await _addRulerPositions(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await _addPendingEdits(db);
           if (oldVersion < 3) await _addPatternsAndReading(db);
           if (oldVersion < 4) await _addCommentsAndSettings(db);
           if (oldVersion < 5) await _addSteps(db);
+          if (oldVersion < 6) await _addLocalProjects(db);
+          if (oldVersion < 7) await _addRulerPositions(db);
         },
       ),
     );
@@ -227,6 +231,35 @@ class LocalDatabase {
         size_index         INTEGER,
         next_moves_counter INTEGER NOT NULL DEFAULT 1,
         PRIMARY KEY (project_id, file_sha256)
+      )
+    ''');
+  }
+
+  /// Version 6: projects kept on this phone only, for knitters without a
+  /// Ravelry account (or projects they haven't added to Ravelry). Each body
+  /// uses Ravelry's field names, so the same screens show both kinds.
+  static Future<void> _addLocalProjects(Database db) async {
+    await db.execute('''
+      CREATE TABLE local_project (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        body       TEXT    NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  /// Version 7: where the row ruler was left, per file and project, so it
+  /// comes back on the same row.
+  static Future<void> _addRulerPositions(Database db) async {
+    await db.execute('''
+      CREATE TABLE ruler_position (
+        file_id    INTEGER NOT NULL,
+        project_id INTEGER NOT NULL,
+        page       INTEGER NOT NULL,
+        top        REAL    NOT NULL,
+        height     REAL    NOT NULL,
+        visible    INTEGER NOT NULL,
+        PRIMARY KEY (file_id, project_id)
       )
     ''');
   }

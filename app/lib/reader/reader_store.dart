@@ -5,6 +5,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../data/local_database.dart';
 import '../library/library_models.dart';
+import 'row_ruler.dart';
 
 /// What kind of mark an annotation is.
 enum AnnotationKind { highlight, ink, note }
@@ -94,6 +95,40 @@ class ReaderStore {
       [projectId],
     );
     return rows.isEmpty ? null : rows.first['file_id'] as int;
+  }
+
+  // Row ruler ----------------------------------------------------------------
+
+  /// Where the ruler was left in [fileId], or null if it was never used.
+  Future<RulerPosition?> savedRuler(int fileId, {int projectId = noProject}) async {
+    final rows = await _db.query(
+      'ruler_position',
+      where: 'file_id = ? AND project_id = ?',
+      whereArgs: [fileId, projectId],
+    );
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    return RulerPosition(
+      page: row['page'] as int,
+      top: (row['top'] as num).toDouble(),
+      height: (row['height'] as num).toDouble(),
+      visible: row['visible'] == 1,
+    );
+  }
+
+  Future<void> saveRuler(int fileId, RulerPosition ruler, {int projectId = noProject}) async {
+    await _db.insert(
+      'ruler_position',
+      {
+        'file_id': fileId,
+        'project_id': projectId,
+        'page': ruler.page,
+        'top': ruler.top,
+        'height': ruler.height,
+        'visible': ruler.visible ? 1 : 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   // Annotations ------------------------------------------------------------

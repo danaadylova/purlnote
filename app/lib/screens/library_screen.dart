@@ -193,7 +193,8 @@ class _EmptyLibrary extends StatelessWidget {
             Text(
               searching
                   ? 'No patterns match that search.'
-                  : 'Patterns you buy or download on Ravelry show up here. You can also bring in a PDF from Files.',
+                  : 'Bring in your pattern PDFs from Files, from iCloud Drive, a download or anywhere else on this phone. '
+                      'Patterns bought on Ravelry show up here too when a Ravelry account is connected.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),

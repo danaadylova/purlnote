@@ -11,7 +11,7 @@ enum NoteDestination {
   projectComment('Project comment', 'Posted on the project. Anyone who can see the project can read it.'),
 
   /// Added as a dated line to the project's notes. Public.
-  projectNotes('Project notes', 'Added as a dated line in the project\'s notes on Ravelry.');
+  projectNotes('Project notes', 'Added as a dated line in the project\'s notes.');
 
   const NoteDestination(this.label, this.explanation);
 
@@ -26,26 +26,39 @@ typedef NoteResult = ({String text, NoteDestination destination});
 ///
 /// [projectName] is null when reading outside a project; then the note can
 /// only stay on the page. [initialDestination] is the last choice made for
-/// this project.
+/// this project. [allowComments] is false for projects kept on this phone
+/// and without a Ravelry account, since comments live on Ravelry.
 Future<NoteResult?> showNoteSheet(
   BuildContext context, {
   required String? projectName,
   required NoteDestination initialDestination,
   required String tag,
+  bool allowComments = true,
 }) {
   return showModalBottomSheet<NoteResult>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => _NoteSheet(projectName: projectName, initialDestination: initialDestination, tag: tag),
+    builder: (context) => _NoteSheet(
+      projectName: projectName,
+      initialDestination: initialDestination,
+      tag: tag,
+      allowComments: allowComments,
+    ),
   );
 }
 
 class _NoteSheet extends StatefulWidget {
-  const _NoteSheet({required this.projectName, required this.initialDestination, required this.tag});
+  const _NoteSheet({
+    required this.projectName,
+    required this.initialDestination,
+    required this.tag,
+    required this.allowComments,
+  });
 
   final String? projectName;
   final NoteDestination initialDestination;
   final String tag;
+  final bool allowComments;
 
   @override
   State<_NoteSheet> createState() => _NoteSheetState();
@@ -53,8 +66,10 @@ class _NoteSheet extends StatefulWidget {
 
 class _NoteSheetState extends State<_NoteSheet> {
   final _text = TextEditingController();
-  late NoteDestination _destination =
-      widget.projectName == null ? NoteDestination.pageOnly : widget.initialDestination;
+  late NoteDestination _destination = widget.projectName == null ||
+          (!widget.allowComments && widget.initialDestination == NoteDestination.projectComment)
+      ? NoteDestination.pageOnly
+      : widget.initialDestination;
 
   @override
   void dispose() {
@@ -96,7 +111,8 @@ class _NoteSheetState extends State<_NoteSheet> {
                 child: Column(
                   children: [
                     for (final destination in NoteDestination.values)
-                      RadioListTile<NoteDestination>(
+                      if (widget.allowComments || destination != NoteDestination.projectComment)
+                        RadioListTile<NoteDestination>(
                         value: destination,
                         contentPadding: EdgeInsets.zero,
                         title: Text(destination.label),

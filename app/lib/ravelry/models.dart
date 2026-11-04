@@ -96,6 +96,9 @@ class Project {
   final int? patternId;
 
   bool get isOnTheNeedles => statusName == 'In progress';
+
+  /// Kept on this phone only, not on Ravelry (see LocalProjects).
+  bool get isOnPhoneOnly => id < 0;
 }
 
 /// A pattern the knitter has queued to make later.

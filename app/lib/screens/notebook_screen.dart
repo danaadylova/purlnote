@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_session.dart';
 import '../data/local_database.dart';
 import '../data/pending_edit.dart';
+import '../library/library_models.dart';
 import '../ravelry/models.dart';
 import '../theme.dart';
 import '../widgets/project_widgets.dart';
@@ -30,6 +31,13 @@ class NotebookScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Semantics(header: true, child: const Text('Notebook')),
+        actions: [
+          TextButton.icon(
+            onPressed: () => _newProject(context),
+            icon: const Icon(Icons.add),
+            label: const Text('New project'),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: session.refresh,
@@ -44,25 +52,29 @@ class NotebookScreen extends StatelessWidget {
               ),
             _SectionTitle('On the needles', count: onTheNeedles.length),
             if (onTheNeedles.isEmpty)
-              const _Empty('Nothing on the needles. Projects marked "In progress" on Ravelry show up here.')
+              const _Empty('Nothing on the needles yet. Start one with New project.')
             else
               for (final project in onTheNeedles)
                 ProjectCard(project: project, onTap: () => _openProject(context, project)),
-            const SizedBox(height: 8),
-            _StashShortcut(
-              yarnCount: session.stash.length,
-              onTap: () => _push(context, StashScreen(session: session)),
-            ),
-            _SectionTitle('Queue', count: queue.length),
-            if (queue.isEmpty)
-              const _Empty('Your queue is empty.')
-            else ...[
-              for (final item in queue.take(queuePreviewLength)) _QueueRow(item: item),
-              if (queue.length > queuePreviewLength)
-                TextButton(
-                  onPressed: () => _push(context, QueueScreen(queue: queue)),
-                  child: Text('See all ${queue.length}'),
-                ),
+            // Stash and queue live on Ravelry, so they appear once an account
+            // is connected.
+            if (session.connected) ...[
+              const SizedBox(height: 8),
+              _StashShortcut(
+                yarnCount: session.stash.length,
+                onTap: () => _push(context, StashScreen(session: session)),
+              ),
+              _SectionTitle('Queue', count: queue.length),
+              if (queue.isEmpty)
+                const _Empty('Your queue is empty.')
+              else ...[
+                for (final item in queue.take(queuePreviewLength)) _QueueRow(item: item),
+                if (queue.length > queuePreviewLength)
+                  TextButton(
+                    onPressed: () => _push(context, QueueScreen(queue: queue)),
+                    child: Text('See all ${queue.length}'),
+                  ),
+              ],
             ],
             if (others.isNotEmpty) ...[
               _SectionTitle('Other projects', count: others.length),
@@ -85,6 +97,18 @@ class NotebookScreen extends StatelessWidget {
           _ => null,
         } ??
         'An item';
+  }
+
+  /// Starts a project on this phone, optionally with a pattern from the
+  /// library.
+  Future<void> _newProject(BuildContext context) async {
+    final created = await showDialog<({String name, String? patternKey})>(
+      context: context,
+      builder: (context) => _NewProjectDialog(patterns: session.patterns.where((p) => p.isOnPhone).toList()),
+    );
+    if (created == null) return;
+    final id = await session.createProject(name: created.name, patternKey: created.patternKey);
+    if (context.mounted) _push(context, ProjectScreen(session: session, projectId: id));
   }
 
   void _openProject(BuildContext context, Project project) {
@@ -269,7 +293,9 @@ class _LastUpdated extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String message;
-    if (session.isSyncing) {
+    if (!session.connected) {
+      message = 'Everything here is kept on this phone.';
+    } else if (session.isSyncing) {
       message = 'Updating from Ravelry…';
     } else if (session.lastSyncedAt == null) {
       message = 'Not updated yet. Pull down to update.';
@@ -278,5 +304,74 @@ class _LastUpdated extends StatelessWidget {
       message = 'Updated from Ravelry at $time. Pull down to update.';
     }
     return Text(message, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall);
+  }
+}
+
+/// Asks for a new project's name and, optionally, its pattern.
+class _NewProjectDialog extends StatefulWidget {
+  const _NewProjectDialog({required this.patterns});
+
+  /// Patterns with a PDF on this phone.
+  final List<LibraryPattern> patterns;
+
+  @override
+  State<_NewProjectDialog> createState() => _NewProjectDialogState();
+}
+
+class _NewProjectDialogState extends State<_NewProjectDialog> {
+  final _name = TextEditingController();
+  String? _patternKey;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New project'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(labelText: 'Name', hintText: 'Harbour Raglan for Sam'),
+          ),
+          const SizedBox(height: 12),
+          if (widget.patterns.isEmpty)
+            const Text(
+              'To read a pattern with this project, import its PDF in Library, then open the project.',
+              style: TextStyle(fontSize: 13, color: PurlnoteColors.plumMuted),
+            )
+          else
+            DropdownButtonFormField<String?>(
+              initialValue: _patternKey,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Pattern (optional)'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('None yet')),
+                for (final pattern in widget.patterns)
+                  DropdownMenuItem(value: pattern.key, child: Text(pattern.title, overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (key) => setState(() => _patternKey = key),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () {
+            final name = _name.text.trim();
+            if (name.isEmpty) return;
+            Navigator.pop(context, (name: name, patternKey: _patternKey));
+          },
+          child: const Text('Start'),
+        ),
+      ],
+    );
   }
 }

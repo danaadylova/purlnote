@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../app_session.dart';
 import '../theme.dart';
 
-/// The first screen: what Purlnote does, and "Sign in with Ravelry".
+/// The first screen. Purlnote works fully on its own, so starting without an
+/// account is offered first and on equal footing; connecting Ravelry adds
+/// projects, stash and purchased patterns from there, now or later.
 ///
 /// Ravelry's own approval page opens in the system's secure browser sheet,
 /// so Purlnote never sees the knitter's Ravelry password.
@@ -39,34 +41,48 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             const SizedBox(height: 32),
             Semantics(
               header: true,
-              child: Text('Your knitting notebook', style: text.headlineMedium),
+              child: Text('Your knitting and crochet notebook', style: text.headlineMedium),
             ),
             const SizedBox(height: 12),
             Text(
-              'Keep your projects, stash and patterns together on your phone, '
-              'and read patterns with notes that stay where you left them.',
+              'Read your pattern PDFs with notes, highlights and row counters that stay where you left them, '
+              'and keep track of your projects.',
               style: text.bodyLarge?.copyWith(color: PurlnoteColors.plumMuted, height: 1.45),
             ),
             const SizedBox(height: 32),
-            const _Point(icon: Icons.menu_book_outlined, text: 'Your projects and queue, even offline'),
-            const _Point(icon: Icons.inventory_2_outlined, text: 'Your stash, one tap away'),
-            const _Point(
-                icon: Icons.lock_outline, text: 'You approve on Ravelry; your password never reaches Purlnote'),
+            const _Point(icon: Icons.picture_as_pdf_outlined, text: 'Bring in pattern PDFs from Files'),
+            const _Point(icon: Icons.format_list_numbered, text: 'Follow a pattern step by step, with counters'),
+            const _Point(icon: Icons.cloud_off_outlined, text: 'Everything works offline and stays on this phone'),
             const SizedBox(height: 40),
             if (problem != null) ...[
               _Problem(message: problem),
               const SizedBox(height: 16),
             ],
             FilledButton(
-              onPressed: _signingIn ? null : _signIn,
-              child: _signingIn
-                  ? const SizedBox.square(
-                      dimension: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                    )
-                  : const Text('Sign in with Ravelry'),
+              onPressed: _signingIn ? null : widget.session.startWithoutRavelry,
+              child: const Text('Start on this phone'),
             ),
             const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: _signingIn ? null : _signIn,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                side: const BorderSide(color: PurlnoteColors.moss, width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+              child: _signingIn
+                  ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : const Text('Sign in with Ravelry'),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Signing in brings your Ravelry projects, stash, queue and purchased patterns. '
+              'You can connect Ravelry later from You, or never.',
+              textAlign: TextAlign.center,
+              style: text.bodySmall,
+            ),
+            const SizedBox(height: 8),
             Text(
               'Purlnote is not made by or affiliated with Ravelry.',
               textAlign: TextAlign.center,

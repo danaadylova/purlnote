@@ -22,38 +22,58 @@ class YouScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                  backgroundColor: PurlnoteColors.plum,
-                  foregroundColor: PurlnoteColors.marigold,
-                  child: Icon(Icons.person),
+              if (session.connected) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const CircleAvatar(
+                    backgroundColor: PurlnoteColors.plum,
+                    foregroundColor: PurlnoteColors.marigold,
+                    child: Icon(Icons.person),
+                  ),
+                  title: Text(user?.displayName ?? 'Ravelry account'),
+                  subtitle: user == null ? null : Text('Ravelry: ${user.username}'),
                 ),
-                title: Text(user?.displayName ?? 'Not signed in'),
-                subtitle: user == null ? null : Text('Ravelry: ${user.username}'),
-              ),
-              const Divider(),
-              _Row(
-                icon: Icons.sync,
-                title: 'Changes waiting to send',
-                value: waiting == 0 ? 'None' : '$waiting',
-              ),
-              _Row(
-                icon: Icons.schedule,
-                title: 'Last updated from Ravelry',
-                value: session.lastSyncedAt == null
-                    ? 'Not yet'
-                    : TimeOfDay.fromDateTime(session.lastSyncedAt!).format(context),
-              ),
-              const Divider(),
-              _BackupSwitch(session: session),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.logout),
-                title: const Text('Sign out'),
-                onTap: () => _confirmSignOut(context),
-              ),
+                const Divider(),
+                _Row(
+                  icon: Icons.sync,
+                  title: 'Changes waiting to send',
+                  value: waiting == 0 ? 'None' : '$waiting',
+                ),
+                _Row(
+                  icon: Icons.schedule,
+                  title: 'Last updated from Ravelry',
+                  value: session.lastSyncedAt == null
+                      ? 'Not yet'
+                      : TimeOfDay.fromDateTime(session.lastSyncedAt!).format(context),
+                ),
+                const Divider(),
+                _BackupSwitch(session: session),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Sign out of Ravelry'),
+                  onTap: () => _confirmSignOut(context),
+                ),
+              ] else ...[
+                const ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.phone_iphone),
+                  title: Text('Using Purlnote on this phone'),
+                  subtitle: Text('Your projects, PDFs, notes and counters are kept here.'),
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.link),
+                  title: const Text('Connect a Ravelry account'),
+                  subtitle: const Text(
+                    'Optional. Adds your Ravelry projects, stash, queue and purchased patterns, '
+                    'and lets notes go to project comments. Nothing on this phone is removed.',
+                  ),
+                  onTap: () => _connect(context),
+                ),
+              ],
               const SizedBox(height: 16),
               const Text(
                 'Purlnote is not made by or affiliated with Ravelry. PDFs and your notes on them stay on this phone.',
@@ -66,6 +86,14 @@ class YouScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _connect(BuildContext context) async {
+    await session.signIn();
+    final problem = session.signInProblem;
+    if (problem != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+    }
+  }
+
   Future<void> _confirmSignOut(BuildContext context) async {
     final waiting = session.pendingEdits.length;
     final confirmed = await showDialog<bool>(
@@ -74,7 +102,7 @@ class YouScreen extends StatelessWidget {
         title: const Text('Sign out of Ravelry?'),
         content: Text(
           'Your Ravelry projects, queue and stash are removed from this phone and come back when you sign in. '
-          'PDFs, notes and counters stay on this phone.'
+          'Projects kept on this phone, PDFs, notes and counters stay, and Purlnote keeps working.'
           '${waiting == 0 ? '' : ' $waiting changes that haven\'t reached Ravelry yet will be lost.'}',
         ),
         actions: [
