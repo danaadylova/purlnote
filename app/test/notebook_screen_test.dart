@@ -29,7 +29,9 @@ void main() {
 
   Widget inApp(Widget screen) => MaterialApp(theme: buildPurlnoteTheme(), home: screen);
 
-  testWidgets('the Notebook shows projects on the needles, stash, queue and the rest', (tester) async {
+  testWidgets('the Notebook shows projects on the needles, finished ones, stash and queue', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     late AppSession session;
     late LocalDatabase database;
     await tester.runAsync(() async {
@@ -39,16 +41,22 @@ void main() {
     expect(session.stage, AppStage.ready);
 
     await tester.pumpWidget(inApp(NotebookScreen(session: session)));
+    // Let each card look up its pattern and counters.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pump();
 
     expect(find.text('On the needles · 1'), findsOneWidget);
     expect(find.text('Harbour Raglan'), findsOneWidget);
     expect(find.text('40%'), findsOneWidget);
+    // No PDF on the phone for it, so the card opens the project instead.
+    expect(find.text('Continue knitting'), findsOneWidget);
+    expect(find.text('Finished'), findsOneWidget);
+    expect(find.text('Petal Drop Socks'), findsOneWidget);
     expect(find.text('Stash'), findsOneWidget);
     expect(find.text('1 yarn'), findsOneWidget);
     expect(find.text('Queue · 1'), findsOneWidget);
     expect(find.text('Fennel Socks'), findsOneWidget);
-    expect(find.text('Other projects · 1'), findsOneWidget);
-    expect(find.text('Finished'), findsOneWidget);
+    expect(find.textContaining('Other projects'), findsNothing);
 
     await tester.runAsync(database.close);
   });

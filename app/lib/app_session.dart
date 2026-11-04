@@ -358,9 +358,18 @@ class AppSession extends ChangeNotifier {
   /// Projects with status "In progress", for the top of the Notebook.
   List<Project> get onTheNeedles => projects.where((project) => project.isOnTheNeedles).toList();
 
-  /// Every other project, newest change first.
+  /// Finished projects, most recently finished first.
+  List<Project> get finishedProjects {
+    final finished = projects.where((project) => project.isFinished).toList();
+    DateTime finishedOn(Project project) => project.completed ?? project.updatedAt ?? DateTime(0);
+    finished.sort((a, b) => finishedOn(b).compareTo(finishedOn(a)));
+    return finished;
+  }
+
+  /// Projects neither on the needles nor finished (hibernating, frogged),
+  /// newest change first.
   List<Project> get otherProjects {
-    final others = projects.where((project) => !project.isOnTheNeedles).toList();
+    final others = projects.where((project) => !project.isOnTheNeedles && !project.isFinished).toList();
     others.sort((a, b) => (b.updatedAt ?? DateTime(0)).compareTo(a.updatedAt ?? DateTime(0)));
     return others;
   }

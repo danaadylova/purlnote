@@ -10,12 +10,13 @@ void main() {
     await tester.pumpWidget(MaterialApp(theme: buildPurlnoteTheme(), home: TutorialScreen(onDone: onDone)));
   }
 
-  testWidgets('Next walks through four pages and the last one says Get started', (tester) async {
+  testWidgets('Next walks from the hello page through four more, and the last says Get started', (tester) async {
     var done = 0;
     await showTour(tester, () => done++);
 
-    expect(find.text('Your patterns, always with you'), findsOneWidget);
-    for (final title in ['Mark it up', 'Never lose your row', 'One step at a time']) {
+    expect(find.text('Hello!'), findsOneWidget);
+    expect(find.text('Write to me'), findsOneWidget);
+    for (final title in ['Your patterns, always with you', 'Mark it up', 'Never lose your row', 'One step at a time']) {
       await tester.tap(find.widgetWithText(FilledButton, 'Next'));
       await tester.pumpAndSettle();
       expect(find.text(title), findsOneWidget);

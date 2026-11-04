@@ -113,6 +113,8 @@ class Project {
 
   bool get isOnTheNeedles => statusName == 'In progress';
 
+  bool get isFinished => statusName == 'Finished';
+
   /// Kept on this phone only, not on Ravelry (see LocalProjects).
   bool get isOnPhoneOnly => id < 0;
 }

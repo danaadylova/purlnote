@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../theme.dart';
 
+/// Where the hello page's "Write to me" button sends email.
+const contactEmail = 'danaadylova@gmail.com';
+
 /// A short tour of what Purlnote does, shown on the first launch and from
-/// You → How Purlnote works. Four pages; Skip leaves at any point.
+/// You → How Purlnote works: a hello from the maker, then four pages on what
+/// the app does. Skip leaves at any point.
 class TutorialScreen extends StatefulWidget {
   const TutorialScreen({super.key, required this.onDone, this.doneLabel = 'Get started'});
 
@@ -22,6 +27,14 @@ class _TutorialScreenState extends State<TutorialScreen> {
   int _current = 0;
 
   static const _content = [
+    _Page(
+      title: 'Hello!',
+      body:
+          'Thank you for downloading my app! I created it to easily follow patterns and keep my notes '
+          'organized in one place. Let me know if you have feature suggestions, or just want to reach out.',
+      picture: _HelloPicture(),
+      extra: _WriteToMe(),
+    ),
     _Page(
       title: 'Your patterns, always with you',
       body:
@@ -103,11 +116,14 @@ class _TutorialScreenState extends State<TutorialScreen> {
 }
 
 class _Page extends StatelessWidget {
-  const _Page({required this.title, required this.body, required this.picture});
+  const _Page({required this.title, required this.body, required this.picture, this.extra});
 
   final String title;
   final String body;
   final Widget picture;
+
+  /// Shown under the text, such as a button.
+  final Widget? extra;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +137,7 @@ class _Page extends StatelessWidget {
         Semantics(header: true, child: Text(title, style: text.headlineMedium)),
         const SizedBox(height: 12),
         Text(body, style: text.bodyLarge?.copyWith(color: PurlnoteColors.plumMuted, height: 1.45)),
+        if (extra != null) ...[const SizedBox(height: 12), extra!],
       ],
     );
   }
@@ -153,6 +170,38 @@ class _Dots extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Signs the hello page and opens Mail to write to the maker.
+class _WriteToMe extends StatelessWidget {
+  const _WriteToMe();
+
+  Future<void> _write(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final mail = Uri(scheme: 'mailto', path: contactEmail, query: 'subject=Purlnote');
+    final opened = await launchUrl(mail);
+    if (!opened) {
+      messenger.showSnackBar(const SnackBar(content: Text('No mail app found. You can write to $contactEmail.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Text(
+          '– Dana',
+          style: TextStyle(fontSize: 17, fontStyle: FontStyle.italic, color: PurlnoteColors.plum),
+        ),
+        const Spacer(),
+        TextButton.icon(
+          onPressed: () => _write(context),
+          icon: const Icon(Icons.mail_outline),
+          label: const Text('Write to me'),
+        ),
+      ],
     );
   }
 }
@@ -216,6 +265,53 @@ class _Sheet extends StatelessWidget {
           ),
           ...children,
         ],
+      ),
+    );
+  }
+}
+
+class _HelloPicture extends StatelessWidget {
+  const _HelloPicture();
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      color: PurlnoteColors.plum,
+      child: Center(
+        child: Transform.rotate(
+          angle: -0.05,
+          child: Container(
+            width: 200,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: PurlnoteColors.cream,
+              borderRadius: BorderRadius.circular(6),
+              boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 18, offset: Offset(0, 8))],
+            ),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'p',
+                  style: TextStyle(
+                    color: PurlnoteColors.marigoldDark,
+                    fontSize: 56,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+                SizedBox(height: 14),
+                Text(
+                  'Made with love, one row at a time.',
+                  style: TextStyle(color: PurlnoteColors.plum, fontSize: 16, fontWeight: FontWeight.w600, height: 1.3),
+                ),
+                SizedBox(height: 12),
+                Icon(Icons.favorite, color: PurlnoteColors.blush, size: 22),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -7,13 +7,14 @@ import '../library/library_models.dart';
 import '../ravelry/models.dart';
 import '../theme.dart';
 import '../widgets/project_widgets.dart';
+import 'notebook_cards.dart';
 import 'edit_conflict_screen.dart';
 import 'project_screen.dart';
 import 'queue_screen.dart';
 import 'stash_screen.dart';
 
-/// Home: projects on the needles, a shortcut to the stash, the queue, and
-/// every other project. Read-only in milestone 1.
+/// Home: the projects on the needles as big cards to swipe through, finished
+/// projects below them, then the stash, the queue and every other project.
 class NotebookScreen extends StatelessWidget {
   const NotebookScreen({super.key, required this.session});
 
@@ -25,65 +26,112 @@ class NotebookScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onTheNeedles = session.onTheNeedles;
+    final finished = session.finishedProjects;
     final others = session.otherProjects;
     final queue = session.queue;
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Semantics(header: true, child: const Text('Notebook')),
-        actions: [
-          TextButton.icon(
-            onPressed: () => _newProject(context),
-            icon: const Icon(Icons.add),
-            label: const Text('New project'),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: session.refresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-          children: [
-            if (session.syncProblem != null) _Banner(message: session.syncProblem!),
-            for (final edit in session.conflicts)
-              _ConflictBanner(
-                recordName: _recordName(edit),
-                onTap: () => _push(context, EditConflictScreen(session: session, edit: edit)),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: session.refresh,
+          child: ListView(
+            padding: const EdgeInsets.only(top: 12, bottom: 32),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'On the needles · ${onTheNeedles.length}',
+                            style: const TextStyle(color: PurlnoteColors.plumMuted, fontWeight: FontWeight.w600),
+                          ),
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              'Your notebook',
+                              style: text.headlineLarge?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _NewProjectButton(onPressed: () => _newProject(context)),
+                  ],
+                ),
               ),
-            _SectionTitle('On the needles', count: onTheNeedles.length),
-            if (onTheNeedles.isEmpty)
-              const _Empty('Nothing on the needles yet. Start one with New project.')
-            else
-              for (final project in onTheNeedles)
-                ProjectCard(project: project, onTap: () => _openProject(context, project)),
-            // Stash and queue live on Ravelry, so they appear once an account
-            // is connected.
-            if (session.connected) ...[
-              const SizedBox(height: 8),
-              _StashShortcut(
-                yarnCount: session.stash.length,
-                onTap: () => _push(context, StashScreen(session: session)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    if (session.syncProblem != null) _Banner(message: session.syncProblem!),
+                    for (final edit in session.conflicts)
+                      _ConflictBanner(
+                        recordName: _recordName(edit),
+                        onTap: () => _push(context, EditConflictScreen(session: session, edit: edit)),
+                      ),
+                  ],
+                ),
               ),
-              _SectionTitle('Queue', count: queue.length),
-              if (queue.isEmpty)
-                const _Empty('Your queue is empty.')
-              else ...[
-                for (final item in queue.take(queuePreviewLength)) _QueueRow(item: item),
-                if (queue.length > queuePreviewLength)
-                  TextButton(
-                    onPressed: () => _push(context, QueueScreen(queue: queue)),
-                    child: Text('See all ${queue.length}'),
-                  ),
+              const SizedBox(height: 16),
+              if (onTheNeedles.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: _Empty('Nothing on the needles yet. Start one with the + button.'),
+                )
+              else
+                OnTheNeedlesCarousel(
+                  session: session,
+                  projects: onTheNeedles,
+                  onOpen: (project) => _openProject(context, project),
+                ),
+              if (finished.isNotEmpty) ...[
+                const _SectionTitle('Finished'),
+                FinishedRow(projects: finished, onOpen: (project) => _openProject(context, project)),
               ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Stash and queue live on Ravelry, so they appear once an
+                    // account is connected.
+                    if (session.connected) ...[
+                      const SizedBox(height: 20),
+                      _StashShortcut(
+                        yarnCount: session.stash.length,
+                        onTap: () => _push(context, StashScreen(session: session)),
+                      ),
+                      _SectionTitle('Queue', count: queue.length, padded: false),
+                      if (queue.isEmpty)
+                        const _Empty('Your queue is empty.')
+                      else ...[
+                        for (final item in queue.take(queuePreviewLength)) _QueueRow(item: item),
+                        if (queue.length > queuePreviewLength)
+                          TextButton(
+                            onPressed: () => _push(context, QueueScreen(queue: queue)),
+                            child: Text('See all ${queue.length}'),
+                          ),
+                      ],
+                    ],
+                    if (others.isNotEmpty) ...[
+                      _SectionTitle('Other projects', count: others.length, padded: false),
+                      for (final project in others)
+                        _OtherProjectRow(project: project, onTap: () => _openProject(context, project)),
+                    ],
+                    const SizedBox(height: 16),
+                    _LastUpdated(session: session),
+                  ],
+                ),
+              ),
             ],
-            if (others.isNotEmpty) ...[
-              _SectionTitle('Other projects', count: others.length),
-              for (final project in others)
-                _OtherProjectRow(project: project, onTap: () => _openProject(context, project)),
-            ],
-            const SizedBox(height: 16),
-            _LastUpdated(session: session),
-          ],
+          ),
         ),
       ),
     );
@@ -121,18 +169,50 @@ class NotebookScreen extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title, {required this.count});
+  const _SectionTitle(this.title, {this.count, this.padded = true});
 
   final String title;
-  final int count;
+
+  /// Shown after the title, as in "Queue · 3".
+  final int? count;
+
+  /// Whether to add the screen's side margins (for titles outside a padded
+  /// column).
+  final bool padded;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 10),
+      padding: EdgeInsets.fromLTRB(padded ? 20 : 0, 24, padded ? 20 : 0, 10),
       child: Semantics(
         header: true,
-        child: Text('$title · $count', style: Theme.of(context).textTheme.titleMedium),
+        child: Text(count == null ? title : '$title · $count', style: Theme.of(context).textTheme.titleLarge),
+      ),
+    );
+  }
+}
+
+/// The square plum "+" that starts a new project.
+class _NewProjectButton extends StatelessWidget {
+  const _NewProjectButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'New project',
+      child: Material(
+        color: PurlnoteColors.plum,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onPressed,
+          child: const SizedBox.square(
+            dimension: 48,
+            child: Icon(Icons.add, color: PurlnoteColors.marigold, size: 28, semanticLabel: 'New project'),
+          ),
+        ),
       ),
     );
   }
