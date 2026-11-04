@@ -145,11 +145,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
   Future<void> _placeNote(int page, Offset at) async {
     final projectId = widget.projectId;
     final tag = _tagFor(page);
+    final lastDestination =
+        projectId == null ? NoteDestination.pageOnly : await widget.session.noteDestinationFor(projectId);
+    if (!mounted) return;
     final result = await showNoteSheet(
       context,
       projectName: projectId == null ? null : widget.session.projectById(projectId)?.name,
-      initialDestination:
-          projectId == null ? NoteDestination.pageOnly : await widget.session.noteDestinationFor(projectId),
+      initialDestination: lastDestination,
       tag: tag.text,
     );
     if (result == null) return;
