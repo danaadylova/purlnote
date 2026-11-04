@@ -12,7 +12,7 @@ import 'support/fake_ravelry.dart';
 import 'support/fakes.dart';
 
 void main() {
-  /// A session that has already synced from [ravelry].
+  /// A session that has finished its first sync from [ravelry].
   Future<AppSession> syncedSession(FakeRavelry ravelry, LocalDatabase database) async {
     final auth = await signedInAuth();
     final session = AppSession(
@@ -24,7 +24,12 @@ void main() {
         clock: () => testNow,
       ),
     );
+    // A first sign-in waits on the first-sync screen until the knitter taps
+    // "Open my notebook".
     await session.start();
+    expect(session.stage, AppStage.firstSync);
+    expect(session.canLeaveFirstSync, isTrue);
+    session.finishFirstSync();
     return session;
   }
 

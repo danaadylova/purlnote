@@ -35,20 +35,17 @@ class NotebookScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [
             if (session.syncProblem != null) _Banner(message: session.syncProblem!),
-
             _SectionTitle('On the needles', count: onTheNeedles.length),
             if (onTheNeedles.isEmpty)
               const _Empty('Nothing on the needles. Projects marked "In progress" on Ravelry show up here.')
             else
               for (final project in onTheNeedles)
                 ProjectCard(project: project, onTap: () => _openProject(context, project)),
-
             const SizedBox(height: 8),
             _StashShortcut(
               yarnCount: session.stash.length,
               onTap: () => _push(context, StashScreen(stash: session.stash)),
             ),
-
             _SectionTitle('Queue', count: queue.length),
             if (queue.isEmpty)
               const _Empty('Your queue is empty.')
@@ -60,12 +57,11 @@ class NotebookScreen extends StatelessWidget {
                   child: Text('See all ${queue.length}'),
                 ),
             ],
-
             if (others.isNotEmpty) ...[
               _SectionTitle('Other projects', count: others.length),
-              for (final project in others) _OtherProjectRow(project: project, onTap: () => _openProject(context, project)),
+              for (final project in others)
+                _OtherProjectRow(project: project, onTap: () => _openProject(context, project)),
             ],
-
             const SizedBox(height: 16),
             _LastUpdated(session: session),
           ],
@@ -137,7 +133,8 @@ class _StashShortcut extends StatelessWidget {
               const Icon(Icons.inventory_2_outlined, color: PurlnoteColors.moss),
               const SizedBox(width: 12),
               const Expanded(child: Text('Stash', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
-              Text('$yarnCount ${yarnCount == 1 ? 'yarn' : 'yarns'}', style: const TextStyle(color: PurlnoteColors.plumMuted)),
+              Text('$yarnCount ${yarnCount == 1 ? 'yarn' : 'yarns'}',
+                  style: const TextStyle(color: PurlnoteColors.plumMuted)),
               const SizedBox(width: 4),
               const Icon(Icons.chevron_right, color: PurlnoteColors.plumMuted),
             ],

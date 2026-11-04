@@ -66,7 +66,13 @@ void main() {
   });
 
   test('long lists are fetched page by page', () async {
-    ravelry.stash = [for (var id = 1; id <= 5; id++) {'id': id, 'yarn': {'name': 'Yarn $id'}}];
+    ravelry.stash = [
+      for (var id = 1; id <= 5; id++)
+        {
+          'id': id,
+          'yarn': {'name': 'Yarn $id'}
+        }
+    ];
     ravelry.stashPageSize = 2;
 
     await engine.syncEverything();

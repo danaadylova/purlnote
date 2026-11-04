@@ -50,7 +50,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             const SizedBox(height: 32),
             const _Point(icon: Icons.menu_book_outlined, text: 'Your projects and queue, even offline'),
             const _Point(icon: Icons.inventory_2_outlined, text: 'Your stash, one tap away'),
-            const _Point(icon: Icons.lock_outline, text: 'You approve on Ravelry; your password never reaches Purlnote'),
+            const _Point(
+                icon: Icons.lock_outline, text: 'You approve on Ravelry; your password never reaches Purlnote'),
             const SizedBox(height: 40),
             if (problem != null) ...[
               _Problem(message: problem),

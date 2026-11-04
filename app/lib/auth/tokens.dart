@@ -58,8 +58,7 @@ abstract class TokenStore {
 /// Keeps tokens in the iOS Keychain (or Android Keystore), never in the
 /// database or in logs.
 class SecureTokenStore implements TokenStore {
-  SecureTokenStore([FlutterSecureStorage? storage])
-      : _storage = storage ?? const FlutterSecureStorage();
+  SecureTokenStore([FlutterSecureStorage? storage]) : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 

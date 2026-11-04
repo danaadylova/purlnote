@@ -7,5 +7,9 @@ linter:
     always_declare_return_types: true
     avoid_print: true
 
+analyzer:
+  exclude:
+    - build/**
+
 formatter:
   page_width: 120

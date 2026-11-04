@@ -92,7 +92,8 @@ void main() {
 
     test('explains when the sign-in function says no', () async {
       final auth = makeAuth(
-        reply: (_) => jsonReply({'error': 'server_error', 'error_description': 'Sign-in is not set up yet.'}, status: 500),
+        reply: (_) =>
+            jsonReply({'error': 'server_error', 'error_description': 'Sign-in is not set up yet.'}, status: 500),
       );
       await expectLater(
         auth.signIn(),

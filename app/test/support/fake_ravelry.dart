@@ -16,7 +16,11 @@ class FakeRavelry {
     {'id': 20, 'short_pattern_name': 'Fennel Socks', 'position_in_queue': 1},
   ];
   List<Map<String, dynamic>> stash = [
-    {'id': 30, 'colorway_name': 'Rios', 'yarn': {'name': 'Rios', 'yarn_company_name': 'Malabrigo'}},
+    {
+      'id': 30,
+      'colorway_name': 'Rios',
+      'yarn': {'name': 'Rios', 'yarn_company_name': 'Malabrigo'}
+    },
   ];
 
   /// Stash pages of this size; null means everything on one page.
@@ -59,7 +63,9 @@ class FakeRavelry {
     return jsonReply({
       'stash': items,
       'paginator': {'page': page, 'page_count': pageCount, 'results': stash.length},
-    }, headers: {'etag': '"stash-page-$page"'});
+    }, headers: {
+      'etag': '"stash-page-$page"'
+    });
   }
 
   int countRequestsTo(String path) => requests.where((r) => r.url.path == path).length;
