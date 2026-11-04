@@ -65,6 +65,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: auth-worker
+          wranglerVersion: "4.157.0"
           command: deploy
 
       - name: Deploy with Ravelry credentials
@@ -74,6 +75,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: auth-worker
+          wranglerVersion: "4.157.0"
           command: deploy
           secrets: |
             RAVELRY_CLIENT_ID
