@@ -1,0 +1,55 @@
+# Builds the iPhone app in the cloud and sends it to TestFlight.
+#
+# Set up once in Codemagic (codemagic.io):
+#   1. Add this repository as an app.
+#   2. Team settings › Integrations › Developer Portal: connect an App Store
+#      Connect API key and name the integration "Purlnote App Store Connect".
+#   3. In App Store Connect, create the app with bundle ID
+#      com.danaadylova.purlnote and note its Apple ID (a number on the App
+#      Information page).
+#   4. App settings › Environment variables, in a group named "ravelry", add:
+#        RAVELRY_CLIENT_ID   the Ravelry app's client ID (not a secret)
+#        APP_STORE_APPLE_ID  the number from step 3
+
+workflows:
+  ios-testflight:
+    name: iOS to TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    working_directory: app
+    integrations:
+      app_store_connect: Purlnote App Store Connect
+    environment:
+      flutter: stable
+      xcode: latest
+      groups:
+        - ravelry
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.danaadylova.purlnote
+    triggers:
+      # Only build when asked, so the free build minutes last.
+      events: []
+    scripts:
+      - name: Get packages
+        script: flutter pub get
+      - name: Check
+        script: |
+          flutter analyze
+          flutter test
+      - name: Set up signing
+        script: xcode-project use-profiles
+      - name: Build
+        script: |
+          # Each build gets the next number after the latest one on TestFlight.
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          flutter build ipa --release \
+            --build-number=$((LATEST + 1)) \
+            --dart-define=RAVELRY_CLIENT_ID="$RAVELRY_CLIENT_ID" \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

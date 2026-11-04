@@ -10,6 +10,7 @@ The design (RFC and screen mockups) is kept outside the repo.
 | --- | --- |
 | `app/` | The Flutter app. See `app/README.md`. |
 | `auth-worker/` | The sign-in function (Cloudflare Worker). Holds Ravelry's client secret so the app doesn't have to. Also serves the milestone 0 check page at `/spike`. |
+| `codemagic.yaml` | Builds the iPhone app in the cloud and sends it to TestFlight (setup steps at the top of the file). |
 | `.github/workflows/` | Checks the app and the function on every push, and deploys the function to Cloudflare from `main`. |
 
 ## Milestones
