@@ -6,8 +6,8 @@ workers_dev = true
 [vars]
 # The only redirect the token endpoint accepts for the phone app.
 APP_REDIRECT_URI = "purlnote://oauth-callback"
-# The milestone 0 check page at /spike. Set to "false" after milestone 0.
-SPIKE_ENABLED = "true"
+# The milestone 0 check page at /spike. Off now that milestone 0 is done.
+SPIKE_ENABLED = "false"
 
 # Secrets (set from GitHub Actions, never committed):
 #   RAVELRY_CLIENT_ID, RAVELRY_CLIENT_SECRET
