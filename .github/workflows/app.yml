@@ -48,9 +48,8 @@ jobs:
   platform-folders:
     if: github.event_name == 'workflow_dispatch' && inputs.create_platform_folders
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -58,12 +57,16 @@ jobs:
           channel: stable
           cache: true
       - name: Generate platform folders
+        working-directory: app
+        run: flutter create --org com.danaadylova --project-name purlnote --platforms=ios,android .
+      # Pushed to a temporary branch so the folders can be reviewed and copied
+      # onto main by hand. Only ios/, android/ and .metadata are kept; files
+      # flutter create adds elsewhere (such as a sample test) are dropped.
+      - name: Push to the platform-folders branch
         run: |
-          flutter create --org com.danaadylova --project-name purlnote --platforms=ios,android .
-          git status --porcelain --untracked-files=all -- . | awk '{print $2}' | sed 's#^app/##' > ../new-files.txt
-          cat ../new-files.txt
-          tar -czf ../platform-folders.tgz -T ../new-files.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: platform-folders
-          path: platform-folders.tgz
+          git config user.name "Dana Adylova"
+          git config user.email "danaadylova@gmail.com"
+          git checkout -b platform-folders
+          git add app/ios app/android app/.metadata
+          git commit -m "Generated iOS and Android project folders"
+          git push --force origin platform-folders
