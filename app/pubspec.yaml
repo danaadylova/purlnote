@@ -1,0 +1,30 @@
+name: purlnote
+description: A phone notebook for your Ravelry projects, stash and patterns.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Talking to Ravelry and the sign-in function.
+  http: ^1.2.2
+  # Ravelry's sign-in page in the system's secure browser sheet.
+  flutter_web_auth_2: ^4.1.0
+  # Tokens live in the iOS Keychain / Android Keystore.
+  flutter_secure_storage: ^9.2.2
+  # The local database every screen reads from.
+  sqflite: ^2.4.1
+  path: ^1.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  # Runs the same SQLite database in tests on a plain computer.
+  sqflite_common_ffi: ^2.3.4
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,69 @@
+name: app
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/app.yml"]
+  pull_request:
+    paths: ["app/**", ".github/workflows/app.yml"]
+  workflow_dispatch:
+    inputs:
+      create_platform_folders:
+        description: "Generate the ios/ and android/ folders and attach them to the run"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+
+      - name: Formatting
+        run: |
+          dart format .
+          if ! git diff --quiet -- .; then
+            echo "::warning::Some files are not formatted. The diff below shows the fix."
+            git diff -- .
+          fi
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  platform-folders:
+    if: github.event_name == 'workflow_dispatch' && inputs.create_platform_folders
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate platform folders
+        run: |
+          flutter create --org com.danaadylova --project-name purlnote --platforms=ios,android .
+          git status --porcelain --untracked-files=all -- . | awk '{print $2}' | sed 's#^app/##' > ../new-files.txt
+          cat ../new-files.txt
+          tar -czf ../platform-folders.tgz -T ../new-files.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-folders
+          path: platform-folders.tgz
