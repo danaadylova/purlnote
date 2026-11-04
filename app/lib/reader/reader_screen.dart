@@ -5,6 +5,7 @@ import '../app_session.dart';
 import '../library/library_models.dart';
 import '../notes/note_sheet.dart';
 import '../notes/project_comments.dart';
+import '../steps/steps_view.dart';
 import '../theme.dart';
 import 'awake_timer.dart';
 import 'counters_bar.dart';
@@ -61,6 +62,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// Where the row ruler sits, as a fraction of the reading area's height.
   double _rulerAt = 0.4;
   bool _loading = true;
+
+  /// Showing the Steps view instead of the PDF page.
+  bool _showSteps = false;
 
   @override
   void initState() {
@@ -397,10 +401,28 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ? const _NothingDownloaded()
                 : Column(
                     children: [
+                      _PageOrSteps(showSteps: _showSteps, onChanged: (steps) => setState(() => _showSteps = steps)),
                       if (_files.length > 1)
                         _FileSwitcher(files: _files, current: file, onChanged: (f) => _showFile(f)),
-                      Expanded(child: _buildPages(file)),
-                      _Toolbar(
+                      if (_showSteps)
+                        Expanded(
+                          child: StepsView(
+                            key: ValueKey('steps-${file.id}'),
+                            session: widget.session,
+                            fileSha256: file.sha256!,
+                            pdfPath: file.localPath!,
+                            projectId: _projectId,
+                            rows: _counters.isEmpty ? null : _counters.first.value,
+                            onRowsChanged: _counters.isEmpty ? null : _setRows,
+                            onShowPage: (page) => setState(() {
+                              _startPage = page;
+                              _showSteps = false;
+                            }),
+                          ),
+                        )
+                      else ...[
+                        Expanded(child: _buildPages(file)),
+                        _Toolbar(
                         tool: _tool,
                         rulerOn: _rulerOn,
                         onTool: (tool) => setState(() {
@@ -411,6 +433,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                           }
                         }),
                       ),
+                      ],
                       if (_counters.isNotEmpty)
                         Container(
                           color: Colors.white,
@@ -471,6 +494,32 @@ class _ReaderScreenState extends State<ReaderScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Switches between the PDF page and the Steps view.
+class _PageOrSteps extends StatelessWidget {
+  const _PageOrSteps({required this.showSteps, required this.onChanged});
+
+  final bool showSteps;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: SegmentedButton<bool>(
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(value: false, label: Text('Page'), icon: Icon(Icons.picture_as_pdf_outlined)),
+          ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.format_list_numbered)),
+        ],
+        selected: {showSteps},
+        onSelectionChanged: (selection) => onChanged(selection.first),
+      ),
     );
   }
 }

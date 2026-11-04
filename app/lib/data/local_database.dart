@@ -24,7 +24,7 @@ class LocalDatabase {
   final Database _db;
 
   static const _fileName = 'purlnote.db';
-  static const _version = 4;
+  static const _version = 5;
 
   /// Opens (and if needed creates) the database.
   ///
@@ -41,11 +41,13 @@ class LocalDatabase {
           await _addPendingEdits(db);
           await _addPatternsAndReading(db);
           await _addCommentsAndSettings(db);
+          await _addSteps(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await _addPendingEdits(db);
           if (oldVersion < 3) await _addPatternsAndReading(db);
           if (oldVersion < 4) await _addCommentsAndSettings(db);
+          if (oldVersion < 5) await _addSteps(db);
         },
       ),
     );
@@ -192,6 +194,39 @@ class LocalDatabase {
       CREATE TABLE app_setting (
         name  TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      )
+    ''');
+  }
+
+  /// Version 5: step-by-step instructions, made from a PDF's text.
+  static Future<void> _addSteps(Database db) async {
+    // Steps belong to a file's SHA-256, like annotations, so an updated PDF
+    // gets its own steps and the earlier version keeps its fixes.
+    await db.execute('''
+      CREATE TABLE pattern_step (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_sha256  TEXT    NOT NULL,
+        step_order   INTEGER NOT NULL,
+        section      TEXT,
+        label        TEXT,
+        side         TEXT,
+        text         TEXT    NOT NULL,
+        source_page  INTEGER NOT NULL,
+        repeat_index INTEGER,
+        repeat_total INTEGER,
+        made_by      TEXT    NOT NULL,
+        hidden       INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    // Where a project is in a file's steps, and the size being made.
+    await db.execute('''
+      CREATE TABLE step_progress (
+        project_id         INTEGER NOT NULL,
+        file_sha256        TEXT    NOT NULL,
+        current_step       INTEGER NOT NULL DEFAULT 0,
+        size_index         INTEGER,
+        next_moves_counter INTEGER NOT NULL DEFAULT 1,
+        PRIMARY KEY (project_id, file_sha256)
       )
     ''');
   }

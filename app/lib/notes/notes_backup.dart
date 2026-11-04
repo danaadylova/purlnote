@@ -7,7 +7,7 @@ import '../data/local_database.dart';
 import '../ravelry/ravelry_client.dart';
 
 /// Backs up what only the phone knows (notes, highlights, counters, reading
-/// spots and screen-awake settings) to the knitter's own Ravelry account, in
+/// spots, the size and step reached in Steps, and screen-awake settings) to the knitter's own Ravelry account, in
 /// the per-app storage Ravelry offers for this.
 ///
 /// PDFs are not backed up (they're large and not ours to copy), and neither
@@ -16,7 +16,7 @@ import '../ravelry/ravelry_client.dart';
 /// Stored under these keys:
 /// - `pn_index`: the file keys below, separated by spaces.
 /// - `pn_f_` plus the first 16 characters of a PDF's SHA-256: that PDF's
-///   marks and reading spots.
+///   marks, reading spots and place in its steps.
 /// - `pn_counters`: every project's counters.
 /// - `pn_settings`: the screen-awake setting per Ravelry pattern.
 /// Only keys whose content changed since the last backup are written.
@@ -82,6 +82,17 @@ class NotesBackup {
       final sha = row['sha256'] as String;
       final entry = files.putIfAbsent(sha, () => {'sha256': sha, 'marks': <Object?>[], 'spots': <String, int>{}});
       (entry['spots'] as Map<String, int>)['${row['project_id']}'] = row['page'] as int;
+    }
+
+    // The size being made and the current step, per project.
+    for (final row in await _db.query('step_progress')) {
+      final sha = row['file_sha256'] as String;
+      final entry = files.putIfAbsent(sha, () => {'sha256': sha, 'marks': <Object?>[], 'spots': <String, int>{}});
+      (entry.putIfAbsent('steps', () => <String, Object?>{}) as Map<String, Object?>)['${row['project_id']}'] = {
+        'step': row['current_step'],
+        'size': row['size_index'],
+        'counter': row['next_moves_counter'],
+      };
     }
 
     final counters = <String, List<Object?>>{};
@@ -166,6 +177,21 @@ class NotesBackup {
           conflictAlgorithm: ConflictAlgorithm.ignore,
         );
       }
+    }
+    final steps = file['steps'] as Map<String, dynamic>? ?? const {};
+    for (final entry in steps.entries) {
+      final progress = entry.value as Map<String, dynamic>;
+      await _db.insert(
+        'step_progress',
+        {
+          'project_id': int.parse(entry.key),
+          'file_sha256': sha,
+          'current_step': progress['step'],
+          'size_index': progress['size'],
+          'next_moves_counter': progress['counter'],
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
     return restored;
   }

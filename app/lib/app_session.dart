@@ -16,6 +16,8 @@ import 'notes/project_comments.dart';
 import 'ravelry/models.dart';
 import 'ravelry/ravelry_client.dart';
 import 'reader/reader_store.dart';
+import 'steps/step_builder.dart';
+import 'steps/steps_store.dart';
 
 /// Which part of the app the knitter sees.
 enum AppStage {
@@ -45,8 +47,16 @@ class AppSession extends ChangeNotifier {
     this.pdfFiles,
     this.comments,
     this.backup,
+    StepBuilder? stepBuilder,
   })  : library = LibraryStore(database),
-        reader = ReaderStore(database);
+        reader = ReaderStore(database),
+        steps = StepsStore(database) {
+    this.stepBuilder = stepBuilder ?? StepBuilder(store: steps);
+  }
+
+  /// Step-by-step instructions made from each PDF.
+  final StepsStore steps;
+  late final StepBuilder stepBuilder;
 
   /// Posts notes as project comments. Null in tests that don't need it.
   final ProjectComments? comments;
