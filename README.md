@@ -31,6 +31,8 @@ Purlnote is in beta on TestFlight, with the App Store release coming next.
 
 ## Privacy
 
+The full policy is at [danaadylova.github.io/purlnote/privacy.html](https://danaadylova.github.io/purlnote/privacy.html). In short:
+
 - Your PDFs, notes, highlights and counters stay on your phone.
 - There are no ads, no analytics and no Purlnote account.
 - With Ravelry connected, the app talks directly to Ravelry. The only exception is sign-in itself, which goes through a small sign-in function that keeps Ravelry's client secret out of the app. That function stores and logs nothing.
@@ -46,7 +48,8 @@ Ideas, bugs, or just hello: **unraveled.makes@gmail.com**, or **More → Send fe
 | --- | --- |
 | `app/` | The Flutter app. [`app/README.md`](app/README.md) explains how the code fits together and how to run it. |
 | `auth-worker/` | The sign-in function (a Cloudflare Worker). Ravelry only accepts its client secret from a server, so this holds it and swaps sign-in codes for tokens. |
-| `design/` | The app icon and the script that draws it. |
+| `design/` | The app icon and the script that draws it, and the App Store screenshot framer. |
+| `docs/` | The website (home, privacy policy, support), served by GitHub Pages. |
 | `codemagic.yaml` | Builds the iPhone app in the cloud and uploads it to TestFlight. Setup steps are at the top of the file. |
 | `.github/workflows/` | On every push: format, analyze and test the app; test the sign-in function and deploy it to Cloudflare from `main`. |
 
