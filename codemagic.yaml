@@ -1,15 +1,24 @@
 # Builds the iPhone app in the cloud and sends it to TestFlight.
 #
-# Set up once in Codemagic (codemagic.io):
-#   1. Add this repository as an app.
-#   2. Team settings › Integrations › Developer Portal: connect an App Store
-#      Connect API key and name the integration "Purlnote App Store Connect".
-#   3. In App Store Connect, create the app with bundle ID
-#      com.danaadylova.purlnote and note its Apple ID (a number on the App
-#      Information page).
-#   4. App settings › Environment variables, in a group named "ravelry", add:
-#        RAVELRY_CLIENT_ID   the Ravelry app's client ID (not a secret)
-#        APP_STORE_APPLE_ID  the number from step 3
+# Signing uses an App Store Connect API key kept in Codemagic's encrypted
+# environment variables, so no Codemagic team or manual certificates are
+# needed: Codemagic creates the distribution certificate and profile itself.
+#
+# Set up once:
+#   1. In App Store Connect, create the app with bundle ID
+#      com.danaadylova.purlnote, and an API key (Users and Access ›
+#      Integrations › App Store Connect API, access "App Manager").
+#   2. On your Mac, make a private key for the signing certificate:
+#        ssh-keygen -t rsa -b 2048 -m PEM -f ~/Desktop/ios_distribution_private_key -q -N ""
+#   3. In Codemagic › this app › Environment variables, add these to a group
+#      named "app_store", all marked Secret:
+#        APP_STORE_CONNECT_ISSUER_ID       Issuer ID from step 1
+#        APP_STORE_CONNECT_KEY_IDENTIFIER  Key ID from step 1
+#        APP_STORE_CONNECT_PRIVATE_KEY     the whole .p8 file's text
+#        CERTIFICATE_PRIVATE_KEY           the whole text of the file from step 2
+#      and to a group named "ravelry":
+#        RAVELRY_CLIENT_ID                 the Ravelry app's client ID (not secret)
+#        APP_STORE_APPLE_ID                the app's Apple ID number (App Information page)
 
 workflows:
   ios-testflight:
@@ -17,16 +26,14 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     working_directory: app
-    integrations:
-      app_store_connect: Purlnote App Store Connect
     environment:
       flutter: stable
       xcode: latest
       groups:
+        - app_store
         - ravelry
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.danaadylova.purlnote
+      vars:
+        BUNDLE_ID: com.danaadylova.purlnote
     triggers:
       # Only build when asked, so the free build minutes last.
       events: []
@@ -38,7 +45,11 @@ workflows:
           flutter analyze
           flutter test
       - name: Set up signing
-        script: xcode-project use-profiles
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Build
         script: |
           # Each build gets the next number after the latest one on TestFlight.
@@ -51,5 +62,7 @@ workflows:
       - build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
-        auth: integration
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: true
