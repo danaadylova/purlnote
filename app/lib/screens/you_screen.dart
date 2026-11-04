@@ -46,6 +46,8 @@ class YouScreen extends StatelessWidget {
                     : TimeOfDay.fromDateTime(session.lastSyncedAt!).format(context),
               ),
               const Divider(),
+              _BackupSwitch(session: session),
+              const Divider(),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.logout),
@@ -99,6 +101,52 @@ class _Row extends StatelessWidget {
       leading: Icon(icon),
       title: Text(title),
       trailing: Text(value, style: const TextStyle(color: PurlnoteColors.plumMuted)),
+    );
+  }
+}
+
+/// The notes-backup switch. On by default; turning it off deletes the copy
+/// kept in the knitter's Ravelry account.
+class _BackupSwitch extends StatefulWidget {
+  const _BackupSwitch({required this.session});
+
+  final AppSession session;
+
+  @override
+  State<_BackupSwitch> createState() => _BackupSwitchState();
+}
+
+class _BackupSwitchState extends State<_BackupSwitch> {
+  bool? _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.session.isBackupEnabled().then((enabled) {
+      if (mounted) setState(() => _enabled = enabled);
+    });
+  }
+
+  Future<void> _change(bool enabled) async {
+    setState(() => _enabled = enabled);
+    final problem = await widget.session.setBackupEnabled(enabled);
+    if (problem != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      secondary: const Icon(Icons.backup_outlined),
+      title: const Text('Back up notes to Ravelry'),
+      subtitle: const Text(
+        'Notes, highlights, counters and reading spots, kept privately in your Ravelry account. '
+        'PDFs and pen drawings stay on this phone.',
+      ),
+      value: _enabled ?? true,
+      onChanged: _enabled == null ? null : _change,
     );
   }
 }

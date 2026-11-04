@@ -24,7 +24,7 @@ class LocalDatabase {
   final Database _db;
 
   static const _fileName = 'purlnote.db';
-  static const _version = 3;
+  static const _version = 4;
 
   /// Opens (and if needed creates) the database.
   ///
@@ -40,10 +40,12 @@ class LocalDatabase {
           await _createVersion1(db);
           await _addPendingEdits(db);
           await _addPatternsAndReading(db);
+          await _addCommentsAndSettings(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await _addPendingEdits(db);
           if (oldVersion < 3) await _addPatternsAndReading(db);
+          if (oldVersion < 4) await _addCommentsAndSettings(db);
         },
       ),
     );
@@ -162,6 +164,34 @@ class LocalDatabase {
         every_n_rows  INTEGER,
         total_repeats INTEGER,
         sort_order    INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  /// Version 4: project comments waiting to be posted, and app settings.
+  static Future<void> _addCommentsAndSettings(Database db) async {
+    // A note sent to a project's comments. Kept until Ravelry has it, so a
+    // note written offline is posted later. posted_comment_id is Ravelry's
+    // ID once posted, so the note can find (and delete) its comment.
+    await db.execute('''
+      CREATE TABLE project_comment (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id        INTEGER NOT NULL,
+        body              TEXT    NOT NULL,
+        annotation_id     INTEGER,
+        state             TEXT    NOT NULL,
+        attempts          INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at   INTEGER,
+        problem           TEXT,
+        posted_comment_id INTEGER,
+        created_at        INTEGER NOT NULL
+      )
+    ''');
+    // Small settings, such as whether the notes backup is on.
+    await db.execute('''
+      CREATE TABLE app_setting (
+        name  TEXT PRIMARY KEY,
+        value TEXT NOT NULL
       )
     ''');
   }
@@ -329,6 +359,17 @@ class LocalDatabase {
     await _db.delete('ravelry_record');
     await _db.delete('sync_state');
     await _db.delete('pending_edit');
+    await _db.delete('project_comment');
+  }
+
+  /// A setting's stored value, or null if never set.
+  Future<String?> setting(String name) async {
+    final rows = await _db.query('app_setting', where: 'name = ?', whereArgs: [name]);
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+
+  Future<void> saveSetting(String name, String value) async {
+    await _db.insert('app_setting', {'name': name, 'value': value}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   /// The underlying SQLite database, for the stores that keep the phone's

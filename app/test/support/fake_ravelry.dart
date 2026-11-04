@@ -56,6 +56,20 @@ class FakeRavelry {
   /// Answers every update with this status instead of saving it.
   int? updateStatus;
 
+  /// Comments on projects, by project ID. Ravelry returns bodies as HTML.
+  final Map<int, List<Map<String, dynamic>>> comments = {};
+  int _nextCommentId = 5000;
+
+  /// Answers comment posts with this status instead of posting.
+  int? commentStatus;
+
+  /// Posts the comment but drops the connection before replying, as if the
+  /// phone went offline mid-send.
+  bool dropConnectionAfterNextComment = false;
+
+  /// The knitter's app data store.
+  final Map<String, String> appData = {};
+
   http.Client get client => MockClient((request) async {
         requests.add(request);
         if (rejectNextToken) {
@@ -65,11 +79,15 @@ class FakeRavelry {
         return _answer(request);
       });
 
-  /// The JSON bodies of every update sent, in order.
+  /// The JSON bodies of every project or stash update sent, in order.
   List<Map<String, dynamic>> get updatesSent => [
         for (final request in requests)
-          if (request.method == 'POST') jsonDecode(request.body) as Map<String, dynamic>,
+          if (request.method == 'POST' && request.headers['Content-Type'] == 'application/json')
+            jsonDecode(request.body) as Map<String, dynamic>,
       ];
+
+  /// How many comments were posted (not counting refused ones).
+  int get commentsPosted => comments.values.fold(0, (sum, list) => sum + list.length);
 
   http.Response _answer(http.Request request) {
     final path = request.url.path;
@@ -81,6 +99,31 @@ class FakeRavelry {
     if (path == '/people/unraveled-makes/stash/list.json') return _stashPage(request);
     if (path == '/projects/project_statuses.json') return _withTag(request, {'project_statuses': projectStatuses});
     if (path == '/people/unraveled-makes/library/search.json') return _withTag(request, {'volumes': library});
+
+    if (path == '/comments/create.json') return _createComment(request);
+    final deleteComment = RegExp(r'^/comments/(\d+)\.json$').firstMatch(path);
+    if (deleteComment != null && request.method == 'DELETE') {
+      final id = int.parse(deleteComment.group(1)!);
+      for (final list in comments.values) {
+        list.removeWhere((c) => c['id'] == id);
+      }
+      return jsonReply({'comment': {'id': id}});
+    }
+    if (path == '/app/data/set.json') {
+      appData.addAll(Uri.splitQueryString(request.body));
+      return jsonReply({'data': Uri.splitQueryString(request.body)});
+    }
+    if (path == '/app/data/get.json') {
+      final keys = request.url.queryParameters['keys']!.split(' ');
+      return jsonReply({
+        'data': {for (final key in keys) if (appData.containsKey(key)) key: appData[key]},
+      });
+    }
+    if (path == '/app/data/delete.json') {
+      final keys = Uri.splitQueryString(request.body)['keys']!.split(' ');
+      keys.forEach(appData.remove);
+      return jsonReply({'data': {}});
+    }
 
     final project = RegExp(r'^/projects/unraveled-makes/(\d+)\.json$').firstMatch(path);
     if (project != null) return _recordPage(request, projects, int.parse(project.group(1)!), 'project');
@@ -102,7 +145,27 @@ class FakeRavelry {
       final statusName = projectStatuses.where((s) => s['id'] == statusId).firstOrNull?['name'];
       if (key == 'project' && statusName != null) record['status_name'] = statusName;
     }
+    if (request.url.queryParameters['include'] == 'comments') {
+      return jsonReply({key: record, 'comments': comments[id] ?? []});
+    }
     return jsonReply({key: record});
+  }
+
+  http.Response _createComment(http.Request request) {
+    final status = commentStatus;
+    if (status != null) return http.Response('refused', status);
+    final fields = Uri.splitQueryString(request.body);
+    final comment = {
+      'id': _nextCommentId++,
+      'body': '<p>${fields['body']}</p>',
+      'user': {'username': 'unraveled-makes'},
+    };
+    comments.putIfAbsent(int.parse(fields['commented_id']!), () => []).add(comment);
+    if (dropConnectionAfterNextComment) {
+      dropConnectionAfterNextComment = false;
+      throw http.ClientException('connection dropped');
+    }
+    return jsonReply({'comment': comment});
   }
 
   /// Change a project as if someone edited it on the Ravelry website.

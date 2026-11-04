@@ -3,6 +3,8 @@ import 'package:pdfrx/pdfrx.dart';
 
 import '../app_session.dart';
 import '../library/library_models.dart';
+import '../notes/note_sheet.dart';
+import '../notes/project_comments.dart';
 import '../theme.dart';
 import 'awake_timer.dart';
 import 'counters_bar.dart';
@@ -69,6 +71,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   @override
   void dispose() {
     _awake.stop();
+    widget.session.backUpNotes();
     super.dispose();
   }
 
@@ -129,28 +132,164 @@ class _ReaderScreenState extends State<ReaderScreen> {
     await _reloadMarks();
   }
 
+  /// Where in the pattern a note is: page, file (if there are several) and
+  /// the row counter.
+  NoteTag _tagFor(int page) {
+    return NoteTag(
+      page: page,
+      fileLabel: _files.length > 1 ? _file!.label : null,
+      row: _counters.isEmpty ? null : _counters.first.value,
+    );
+  }
+
   Future<void> _placeNote(int page, Offset at) async {
-    final text = await _editNoteText(context, title: 'New note');
-    if (text == null || text.trim().isEmpty) return;
-    await _store.addAnnotation(
+    final projectId = widget.projectId;
+    final tag = _tagFor(page);
+    final result = await showNoteSheet(
+      context,
+      projectName: projectId == null ? null : widget.session.projectById(projectId)?.name,
+      initialDestination:
+          projectId == null ? NoteDestination.pageOnly : await widget.session.noteDestinationFor(projectId),
+      tag: tag.text,
+    );
+    if (result == null) return;
+
+    // The note always stays on the page, wherever else it goes.
+    final noteId = await _store.addAnnotation(
       fileSha256: _file!.sha256!,
       page: page,
       kind: AnnotationKind.note,
       points: [at],
-      text: text.trim(),
+      text: result.text,
     );
     await _reloadMarks();
+    if (projectId == null) return;
+
+    var destination = result.destination;
+    if (destination == NoteDestination.projectComment && !await _ensureCommentPermission()) {
+      destination = NoteDestination.pageOnly;
+    }
+    await widget.session.sendNoteToProject(
+      projectId: projectId,
+      text: result.text,
+      destination: destination,
+      tag: tag,
+      annotationId: noteId,
+    );
+    if (destination == NoteDestination.projectComment && mounted) {
+      _say('Saved. It posts to the project when you\'re online.');
+    }
+  }
+
+  /// Asks for the comment permission the first time. False if not granted.
+  Future<bool> _ensureCommentPermission() async {
+    if (await widget.session.canPostComments()) return true;
+    if (!mounted || !await explainCommentPermission(context)) return false;
+    final problem = await widget.session.allowComments();
+    if (problem != null && mounted) _say(problem);
+    return problem == null;
   }
 
   Future<void> _openNote(Annotation note) async {
     final text = await _editNoteText(context, title: 'Note on page ${note.page}', initial: note.text, canDelete: true);
     if (text == null) return;
+    final comment = await widget.session.commentForNote(note.id);
+
     if (text.isEmpty) {
       await _store.deleteAnnotation(note.id);
-    } else {
-      await _store.updateNoteText(note.id, text.trim());
+      await _reloadMarks();
+      if (comment != null) await _deleteCommentToo(comment);
+      return;
     }
+
+    final newText = text.trim();
+    if (newText == note.text) return;
+    await _store.updateNoteText(note.id, newText);
     await _reloadMarks();
+    if (comment != null) await _updateComment(note, comment, newText);
+  }
+
+  Future<void> _deleteCommentToo(ProjectCommentRecord comment) async {
+    if (comment.state != CommentState.posted) {
+      await widget.session.cancelComment(comment);
+      return;
+    }
+    final alsoRavelry = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete the comment on Ravelry too?'),
+        content: const Text('This note was posted as a comment on the project.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep the comment')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete it')),
+        ],
+      ),
+    );
+    if (alsoRavelry == true) {
+      final problem = await widget.session.deleteComment(comment.postedCommentId!);
+      if (problem != null && mounted) _say(problem);
+    }
+  }
+
+  /// Ravelry comments can't be edited, only deleted, so an edited note offers
+  /// to replace the comment or add a correction.
+  Future<void> _updateComment(Annotation note, ProjectCommentRecord comment, String newText) async {
+    final projectId = comment.projectId;
+    final tag = NoteTag.parse(comment.body) ?? _tagFor(note.page);
+
+    if (comment.state != CommentState.posted) {
+      // Not posted yet: just send the new text instead.
+      await widget.session.cancelComment(comment);
+      await widget.session.sendNoteToProject(
+        projectId: projectId,
+        text: newText,
+        destination: NoteDestination.projectComment,
+        tag: tag,
+        annotationId: note.id,
+      );
+      return;
+    }
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Update the comment on Ravelry?'),
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text('Ravelry comments can\'t be edited, only deleted.'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'replace'),
+            child: const Text('Delete it and post the new text'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'correct'),
+            child: const Text('Keep it and post a correction'),
+          ),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context), child: const Text('Only change it here')),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    if (choice == 'replace') {
+      final problem = await widget.session.deleteComment(comment.postedCommentId!);
+      if (problem != null) {
+        if (mounted) _say(problem);
+        return;
+      }
+    }
+    await widget.session.sendNoteToProject(
+      projectId: projectId,
+      text: choice == 'correct' ? 'Correction: $newText' : newText,
+      destination: NoteDestination.projectComment,
+      tag: tag,
+      annotationId: note.id,
+    );
+  }
+
+  void _say(String message) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showNotesList() {

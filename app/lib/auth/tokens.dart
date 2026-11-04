@@ -6,6 +6,7 @@ class Tokens {
     required this.accessToken,
     required this.refreshToken,
     required this.expiresAt,
+    this.scopes = const {},
   });
 
   /// Builds tokens from the sign-in function's JSON reply.
@@ -23,8 +24,13 @@ class Tokens {
       accessToken: accessToken,
       refreshToken: json['refresh_token'] as String?,
       expiresAt: now.add(Duration(seconds: lifetimeSeconds)),
+      scopes: parseScopes(json['scope']),
     );
   }
+
+  /// Ravelry lists granted scopes separated by spaces.
+  static Set<String> parseScopes(Object? scope) =>
+      scope is String ? scope.split(' ').where((s) => s.isNotEmpty).toSet() : const {};
 
   final String accessToken;
 
@@ -32,6 +38,9 @@ class Tokens {
   final String? refreshToken;
 
   final DateTime expiresAt;
+
+  /// What the knitter allowed, such as "offline" and "message-write".
+  final Set<String> scopes;
 
   /// True when the access token has expired or will within [margin].
   bool expiresSoon(DateTime now, {Duration margin = const Duration(minutes: 2)}) {
@@ -44,6 +53,8 @@ class Tokens {
       accessToken: newer.accessToken,
       refreshToken: newer.refreshToken ?? refreshToken,
       expiresAt: newer.expiresAt,
+      // A refresh keeps the permissions it was granted with.
+      scopes: newer.scopes.isEmpty ? scopes : newer.scopes,
     );
   }
 }
@@ -69,6 +80,7 @@ class SecureTokenStore implements TokenStore {
   String get _accessKey => '${name}_access_token';
   String get _refreshKey => '${name}_refresh_token';
   String get _expiresKey => '${name}_expires_at';
+  String get _scopesKey => '${name}_scopes';
 
   @override
   Future<Tokens?> read() async {
@@ -79,6 +91,7 @@ class SecureTokenStore implements TokenStore {
       accessToken: access,
       refreshToken: await _storage.read(key: _refreshKey),
       expiresAt: DateTime.fromMillisecondsSinceEpoch(int.parse(expires)),
+      scopes: Tokens.parseScopes(await _storage.read(key: _scopesKey)),
     );
   }
 
@@ -89,6 +102,7 @@ class SecureTokenStore implements TokenStore {
       key: _expiresKey,
       value: tokens.expiresAt.millisecondsSinceEpoch.toString(),
     );
+    await _storage.write(key: _scopesKey, value: tokens.scopes.join(' '));
     final refresh = tokens.refreshToken;
     if (refresh == null) {
       await _storage.delete(key: _refreshKey);
@@ -102,6 +116,7 @@ class SecureTokenStore implements TokenStore {
     await _storage.delete(key: _accessKey);
     await _storage.delete(key: _refreshKey);
     await _storage.delete(key: _expiresKey);
+    await _storage.delete(key: _scopesKey);
   }
 }
 

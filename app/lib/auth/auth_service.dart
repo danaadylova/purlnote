@@ -83,8 +83,15 @@ class AuthService {
 
   Future<bool> isSignedIn() async => await tokenStore.read() != null;
 
+  /// Whether the knitter granted [scope], such as "message-write".
+  Future<bool> hasScope(String scope) async => (await tokenStore.read())?.scopes.contains(scope) ?? false;
+
   /// Runs the whole sign-in. Throws [SignInCancelled] or [SignInFailed].
-  Future<void> signIn() async {
+  ///
+  /// [extraScopes] asks for more than this service's usual [scopes], for
+  /// example the comment permission the first time a note goes to a project.
+  /// The new tokens replace the old ones.
+  Future<void> signIn({List<String> extraScopes = const []}) async {
     if (!config.isComplete) {
       throw const SignInFailed('This build is missing its Ravelry client ID.');
     }
@@ -95,7 +102,7 @@ class AuthService {
         'response_type': 'code',
         'client_id': config.ravelryClientId,
         'redirect_uri': config.redirectUri,
-        'scope': scopes.join(' '),
+        'scope': {...scopes, ...extraScopes}.join(' '),
         'state': state,
       },
     );

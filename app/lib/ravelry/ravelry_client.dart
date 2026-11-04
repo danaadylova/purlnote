@@ -86,35 +86,48 @@ class RavelryClient {
 
   /// POSTs [body] as JSON to [path] (such as an update to a project) and
   /// returns Ravelry's reply. Like [get], refreshes the token once on 401.
-  Future<Map<String, dynamic>> post(String path, Map<String, Object?> body) async {
-    final url = Uri.parse('$baseUrl$path');
-    final json = jsonEncode(body);
+  Future<Map<String, dynamic>> post(String path, Map<String, Object?> body) {
+    return _write('POST', path, body: jsonEncode(body), contentType: 'application/json');
+  }
 
-    var response = await _sendPost(url, await auth.accessToken(), json);
+  /// POSTs [fields] as a form, which some calls (such as creating a comment)
+  /// expect instead of JSON.
+  Future<Map<String, dynamic>> postForm(String path, Map<String, String> fields) {
+    return _write(
+      'POST',
+      path,
+      body: Uri(queryParameters: fields).query,
+      contentType: 'application/x-www-form-urlencoded',
+    );
+  }
+
+  /// DELETEs [path], such as one of the knitter's comments.
+  Future<Map<String, dynamic>> delete(String path) => _write('DELETE', path);
+
+  Future<Map<String, dynamic>> _write(String method, String path, {String? body, String? contentType}) async {
+    final url = Uri.parse('$baseUrl$path');
+
+    Future<http.Response> send(String accessToken) async {
+      final request = http.Request(method, url)
+        ..headers['Authorization'] = 'Bearer $accessToken'
+        ..headers['Accept'] = 'application/json';
+      if (contentType != null) request.headers['Content-Type'] = contentType;
+      if (body != null) request.body = body;
+      try {
+        return await http.Response.fromStream(await _http.send(request));
+      } on Exception {
+        throw const RavelryUnreachable();
+      }
+    }
+
+    var response = await send(await auth.accessToken());
     if (response.statusCode == 401) {
-      final fresh = await auth.refresh();
-      response = await _sendPost(url, fresh.accessToken, json);
+      response = await send((await auth.refresh()).accessToken);
     }
     if (response.statusCode != 200) {
       throw RavelryError(response.statusCode, path);
     }
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
-
-  Future<http.Response> _sendPost(Uri url, String accessToken, String json) async {
-    try {
-      return await _http.post(
-        url,
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: json,
-      );
-    } on Exception {
-      throw const RavelryUnreachable();
-    }
+    return response.body.isEmpty ? const {} : jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<http.Response> _send(Uri url, String accessToken, String? etag) async {

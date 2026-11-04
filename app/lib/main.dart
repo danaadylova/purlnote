@@ -9,6 +9,8 @@ import 'data/outbox.dart';
 import 'data/sync_engine.dart';
 import 'library/library_store.dart';
 import 'library/pdf_files.dart';
+import 'notes/notes_backup.dart';
+import 'notes/project_comments.dart';
 import 'ravelry/ravelry_client.dart';
 import 'screens/first_sync_screen.dart';
 import 'screens/home_screen.dart';
@@ -41,6 +43,8 @@ Future<void> main() async {
     auth: auth,
     pdfAuth: pdfAuth,
     pdfFiles: pdfFiles,
+    comments: ProjectComments(ravelry: ravelry, database: database),
+    backup: NotesBackup(ravelry: ravelry, database: database),
     database: database,
     sync: SyncEngine(
       ravelry: ravelry,

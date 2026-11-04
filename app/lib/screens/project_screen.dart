@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets/edit_widgets.dart';
 import '../widgets/project_widgets.dart';
 import '../library/library_models.dart';
+import '../notes/project_comments.dart';
 import '../reader/reader_screen.dart';
 import 'edit_conflict_screen.dart';
 import 'project_edit_screen.dart';
@@ -110,6 +111,8 @@ class _ProjectDetails extends StatelessWidget {
             const SizedBox(height: 6),
             Text(project.notes!, style: const TextStyle(fontSize: 16, height: 1.45)),
           ],
+          const SizedBox(height: 24),
+          _CommentsSection(session: session, project: project),
         ],
       ),
     );
@@ -201,5 +204,177 @@ class _OpenPatternButton extends StatelessWidget {
       ),
     );
     if (chosen != null) await session.linkProjectToPattern(project.id, chosen.key);
+  }
+}
+
+/// The project's comments: ones still waiting to post (with Cancel), and
+/// the ones on Ravelry. A comment made from a pattern note starts with a tag
+/// like "[Charts p.2 · row 31]"; tapping it opens the pattern at that page.
+class _CommentsSection extends StatefulWidget {
+  const _CommentsSection({required this.session, required this.project});
+
+  final AppSession session;
+  final Project project;
+
+  @override
+  State<_CommentsSection> createState() => _CommentsSectionState();
+}
+
+class _CommentsSectionState extends State<_CommentsSection> {
+  List<RavelryComment>? _comments;
+  List<ProjectCommentRecord> _unsent = const [];
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final comments = await widget.session.loadComments(widget.project.id);
+    final unsent = await widget.session.unsentComments(widget.project.id);
+    if (!mounted) return;
+    setState(() {
+      _comments = comments;
+      _unsent = unsent;
+      _loaded = true;
+    });
+  }
+
+  Future<void> _openAt(NoteTag tag) async {
+    final pattern = await widget.session.patternForProject(widget.project);
+    if (!mounted) return;
+    if (pattern == null || !pattern.isOnPhone) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The pattern PDF isn\'t on this phone yet.')),
+      );
+      return;
+    }
+    final file = pattern.files.where((f) => f.isDownloaded && (tag.fileLabel == null || f.label == tag.fileLabel));
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => ReaderScreen(
+        session: widget.session,
+        pattern: pattern,
+        projectId: widget.project.id,
+        startFileId: file.firstOrNull?.id,
+        startPage: tag.page,
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final comments = _comments;
+    final username = widget.session.user?.username;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(header: true, child: Text('Comments', style: Theme.of(context).textTheme.titleMedium)),
+        for (final waiting in _unsent)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(waiting.state == CommentState.failed ? Icons.error_outline : Icons.schedule),
+            title: Text(waiting.body),
+            subtitle: Text(waiting.problem ?? 'Waiting to send'),
+            trailing: TextButton(
+              onPressed: () async {
+                await widget.session.cancelComment(waiting);
+                await _load();
+              },
+              child: const Text('Cancel'),
+            ),
+          ),
+        if (!_loaded)
+          const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator())
+        else if (comments == null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('Comments show when you\'re online.', style: TextStyle(color: PurlnoteColors.plumMuted)),
+          )
+        else if (comments.isEmpty && _unsent.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'No comments yet. Notes you make on the pattern can be posted here.',
+              style: TextStyle(color: PurlnoteColors.plumMuted),
+            ),
+          )
+        else
+          for (final comment in comments) _CommentTile(
+            comment: comment,
+            isMine: comment.author == username,
+            onOpenPattern: _openAt,
+            onDelete: () async {
+              final problem = await widget.session.deleteComment(comment.id);
+              if (problem != null && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+              }
+              await _load();
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _CommentTile extends StatelessWidget {
+  const _CommentTile({
+    required this.comment,
+    required this.isMine,
+    required this.onOpenPattern,
+    required this.onDelete,
+  });
+
+  final RavelryComment comment;
+  final bool isMine;
+  final ValueChanged<NoteTag> onOpenPattern;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final tag = NoteTag.parse(comment.body);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: PurlnoteColors.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    comment.author ?? 'Someone',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+                if (isMine)
+                  IconButton(
+                    tooltip: 'Delete comment',
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: onDelete,
+                  ),
+              ],
+            ),
+            Text(comment.body, style: const TextStyle(fontSize: 15, height: 1.4)),
+            if (tag != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => onOpenPattern(tag),
+                  icon: const Icon(Icons.menu_book_outlined, size: 18),
+                  label: Text('Open at page ${tag.page}'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -10,6 +10,9 @@ import 'data/sync_engine.dart';
 import 'library/library_models.dart';
 import 'library/library_store.dart';
 import 'library/pdf_files.dart';
+import 'notes/note_sheet.dart';
+import 'notes/notes_backup.dart';
+import 'notes/project_comments.dart';
 import 'ravelry/models.dart';
 import 'ravelry/ravelry_client.dart';
 import 'reader/reader_store.dart';
@@ -34,9 +37,22 @@ enum AppStage {
 /// Screens listen to this and rebuild when it changes. They read only what is
 /// stored here (loaded from the local database), so they work offline.
 class AppSession extends ChangeNotifier {
-  AppSession({required this.auth, required this.database, required this.sync, this.pdfAuth, this.pdfFiles})
-      : library = LibraryStore(database),
+  AppSession({
+    required this.auth,
+    required this.database,
+    required this.sync,
+    this.pdfAuth,
+    this.pdfFiles,
+    this.comments,
+    this.backup,
+  })  : library = LibraryStore(database),
         reader = ReaderStore(database);
+
+  /// Posts notes as project comments. Null in tests that don't need it.
+  final ProjectComments? comments;
+
+  /// Backs up notes to the knitter's Ravelry account. Null in some tests.
+  final NotesBackup? backup;
 
   final AuthService auth;
   final LocalDatabase database;
@@ -119,6 +135,12 @@ class AppSession extends ChangeNotifier {
       firstSyncProgress[step] = count;
       notifyListeners();
     });
+    // Bring back notes and counters backed up from an earlier install.
+    try {
+      await backup?.restore();
+    } on Exception {
+      // Offline or not allowed: the backup stays on Ravelry for next time.
+    }
   }
 
   /// Tries the first sync again after it failed, for example offline.
@@ -142,6 +164,11 @@ class AppSession extends ChangeNotifier {
 
     try {
       await sync.syncEverything(onProgress: onProgress);
+      final username = (await database.records(RecordType.user)).first['username'] as String;
+      await comments?.sendAll(username: username);
+      // A backup problem shouldn't look like a sync problem; it tries again
+      // next time.
+      await backUpNotes();
     } on SignInExpired {
       await signOut();
       signInProblem = 'Your Ravelry sign-in ended. Please sign in again.';
@@ -355,6 +382,130 @@ class AppSession extends ChangeNotifier {
   Future<void> _reloadLibrary() async {
     patterns = await library.patterns();
     notifyListeners();
+  }
+
+  // Notes to projects ------------------------------------------------------
+
+  /// Where new notes for [projectId] go: the last choice made for that
+  /// project, or "keep on the page" the first time.
+  Future<NoteDestination> noteDestinationFor(int projectId) async {
+    final saved = await database.setting('note_destination:$projectId');
+    return NoteDestination.values.where((d) => d.name == saved).firstOrNull ?? NoteDestination.pageOnly;
+  }
+
+  /// Whether the knitter has allowed Purlnote to post comments.
+  Future<bool> canPostComments() => auth.hasScope('message-write');
+
+  /// Asks Ravelry for the comment permission. Returns a message to show if
+  /// it didn't work, or null if it did.
+  Future<String?> allowComments() async {
+    try {
+      await auth.signIn(extraScopes: const ['message-write']);
+      return await canPostComments() ? null : 'Ravelry didn\'t grant permission to post comments.';
+    } on SignInCancelled {
+      return 'Comments weren\'t allowed. The note stays on the page.';
+    } on SignInFailed catch (failure) {
+      return failure.message;
+    }
+  }
+
+  /// Sends a note to the project: as a comment (posted at the next sync, so
+  /// it works offline), or as a dated line in the project's notes.
+  Future<void> sendNoteToProject({
+    required int projectId,
+    required String text,
+    required NoteDestination destination,
+    required NoteTag tag,
+    int? annotationId,
+  }) async {
+    await database.saveSetting('note_destination:$projectId', destination.name);
+    switch (destination) {
+      case NoteDestination.pageOnly:
+        return;
+      case NoteDestination.projectComment:
+        await comments?.queue(projectId: projectId, body: tag.commentBody(text), annotationId: annotationId);
+        notifyListeners();
+        unawaited(refresh());
+      case NoteDestination.projectNotes:
+        // The project list leaves out notes, so get them before adding a line.
+        await loadFullRecord(RecordType.project, projectId);
+        final current = projectById(projectId)?.notes ?? '';
+        final now = DateTime.now();
+        final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        final line = '$date ${tag.commentBody(text)}';
+        await saveEdit(RecordType.project, projectId, {'notes': current.isEmpty ? line : '$current\n$line'});
+    }
+  }
+
+  /// Comments on a project from Ravelry, or null when offline.
+  Future<List<RavelryComment>?> loadComments(int projectId) async {
+    final username = user?.username;
+    final service = comments;
+    if (username == null || service == null) return null;
+    try {
+      return await service.load(username: username, projectId: projectId);
+    } on RavelryUnreachable {
+      return null;
+    } on RavelryError {
+      return null;
+    }
+  }
+
+  /// Comments from notes that haven't reached Ravelry yet.
+  Future<List<ProjectCommentRecord>> unsentComments(int projectId) async =>
+      await comments?.unsent(projectId) ?? const [];
+
+  Future<void> cancelComment(ProjectCommentRecord comment) async {
+    await comments?.cancel(comment.id);
+    notifyListeners();
+  }
+
+  /// The comment a note was posted as, if it was.
+  Future<ProjectCommentRecord?> commentForNote(int annotationId) async => comments?.forAnnotation(annotationId);
+
+  /// Deletes one of the knitter's comments on Ravelry. Returns a message to
+  /// show if it couldn't.
+  Future<String?> deleteComment(int ravelryCommentId) async {
+    try {
+      await comments?.deletePosted(ravelryCommentId);
+      notifyListeners();
+      return null;
+    } on RavelryUnreachable {
+      return 'You\'re offline. Delete the comment when you\'re connected.';
+    } on RavelryError catch (error) {
+      return 'Ravelry couldn\'t delete the comment (error ${error.statusCode}).';
+    }
+  }
+
+  // Notes backup -------------------------------------------------------------
+
+  Future<bool> isBackupEnabled() async => await backup?.isEnabled() ?? false;
+
+  /// Turning the backup off deletes it from Ravelry. Returns a message to
+  /// show if that couldn't be done now.
+  Future<String?> setBackupEnabled(bool enabled) async {
+    try {
+      await backup?.setEnabled(enabled);
+      if (enabled) await backup?.backUp();
+      notifyListeners();
+      return null;
+    } on RavelryUnreachable {
+      return enabled
+          ? 'Backup is on. It runs when you\'re connected.'
+          : 'Backup is off, but the copy on Ravelry couldn\'t be deleted offline. Turn it on and off again when connected.';
+    } on RavelryError catch (error) {
+      return 'Ravelry had a problem (error ${error.statusCode}).';
+    }
+  }
+
+  /// Backs up now, for example when leaving the reader. Quietly does nothing
+  /// offline; the next sync tries again.
+  Future<void> backUpNotes() async {
+    try {
+      await backup?.backUp();
+    } on Exception {
+      return;
+    }
   }
 
   void _moveTo(AppStage next) {
