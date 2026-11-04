@@ -33,7 +33,7 @@ dependencies:
   # Opens Ravelry pages in the browser.
   url_launcher: ^6.3.1
   # The app's version, filled into feedback emails.
-  package_info_plus: ^8.3.0
+  package_info_plus: ^10.0.0
 
 dev_dependencies:
   flutter_test:
