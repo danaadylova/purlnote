@@ -277,8 +277,9 @@ export async function probeComment(api, username, nameContains) {
   const projects = list.data?.projects || [];
   const project = projects.find((p) => String(p.name || "").toLowerCase().includes(wanted));
   if (!project) {
+    if (projects.length === 0) return [false, `Ravelry listed no projects for ${username}, so no comment was posted`];
     const names = projects.slice(0, 10).map((p) => p.name).join(", ");
-    return [false, `No project name contains "${nameContains}". First projects: ${names || "(none)"}`];
+    return [false, `No project name contains "${nameContains}". ${projects.length} projects; first: ${names}`];
   }
   const posted = await api("/comments/create.json", form({ type: "project", commented_id: String(project.id), body: COMMENT_BODY }));
   if (!posted.ok) return [false, `Comment on "${project.name}": ${posted.problem}`];
