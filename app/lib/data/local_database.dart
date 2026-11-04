@@ -94,8 +94,8 @@ class LocalDatabase {
 
   /// Version 3: pattern files and everything the reader keeps.
   ///
-  /// A pattern is either a Ravelry library volume (key "volume:<id>") or a PDF
-  /// the knitter imported (key "import:<id>"). Annotations belong to a file's
+  /// A pattern is either a Ravelry library volume (key `volume:<id>`) or a PDF
+  /// the knitter imported (key `import:<id>`). Annotations belong to a file's
   /// SHA-256, so they survive a re-download of the same file.
   static Future<void> _addPatternsAndReading(Database db) async {
     await db.execute('''

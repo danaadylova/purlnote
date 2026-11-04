@@ -20,7 +20,7 @@ class LibraryPattern {
     this.lastOpenedAt,
   });
 
-  /// "volume:<Ravelry volume id>" or "import:<local id>".
+  /// `volume:<Ravelry volume id>` or `import:<local id>`.
   final String key;
   final String title;
   final PatternSource source;
