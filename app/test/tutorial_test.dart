@@ -16,11 +16,11 @@ void main() {
 
     expect(find.text('Your patterns, always with you'), findsOneWidget);
     for (final title in ['Mark it up', 'Never lose your row', 'One step at a time']) {
-      await tester.tap(find.text('Next'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Next'));
       await tester.pumpAndSettle();
       expect(find.text(title), findsOneWidget);
     }
-    expect(find.text('Next'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Next'), findsNothing);
 
     await tester.tap(find.text('Get started'));
     expect(done, 1);
