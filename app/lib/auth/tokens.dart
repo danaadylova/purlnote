@@ -58,13 +58,17 @@ abstract class TokenStore {
 /// Keeps tokens in the iOS Keychain (or Android Keystore), never in the
 /// database or in logs.
 class SecureTokenStore implements TokenStore {
-  SecureTokenStore([FlutterSecureStorage? storage]) : _storage = storage ?? const FlutterSecureStorage();
+  /// [name] keeps separate sign-ins apart, such as "ravelry" for the main
+  /// one and "ravelry_pdf" for PDF downloads.
+  SecureTokenStore({this.name = 'ravelry', FlutterSecureStorage? storage})
+      : _storage = storage ?? const FlutterSecureStorage();
 
+  final String name;
   final FlutterSecureStorage _storage;
 
-  static const _accessKey = 'ravelry_access_token';
-  static const _refreshKey = 'ravelry_refresh_token';
-  static const _expiresKey = 'ravelry_expires_at';
+  String get _accessKey => '${name}_access_token';
+  String get _refreshKey => '${name}_refresh_token';
+  String get _expiresKey => '${name}_expires_at';
 
   @override
   Future<Tokens?> read() async {

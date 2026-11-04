@@ -7,7 +7,8 @@ enum SyncStep {
   profile('Your profile'),
   projects('Projects'),
   queue('Queue'),
-  stash('Stash');
+  stash('Stash'),
+  library('Pattern library');
 
   const SyncStep(this.label);
 
@@ -71,6 +72,12 @@ class SyncEngine {
         path: '/people/${Uri.encodeComponent(username)}/stash/list.json',
         resultKey: 'stash',
         recordType: RecordType.stash,
+      ),
+      SyncStep.library: _RavelryList(
+        name: 'library',
+        path: '/people/${Uri.encodeComponent(username)}/library/search.json',
+        resultKey: 'volumes',
+        recordType: RecordType.libraryVolume,
       ),
     };
 

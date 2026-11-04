@@ -30,6 +30,9 @@ abstract final class PurlnoteColors {
   /// Note pins, row highlight, progress.
   static const marigold = Color(0xFFE7A33E);
 
+  /// Pen ink and the row ruler's edges.
+  static const marigoldDark = Color(0xFFC9822A);
+
   /// Warnings and the offline banner.
   static const blush = Color(0xFFF4CDBE);
   static const brown = Color(0xFF8A5A2B);

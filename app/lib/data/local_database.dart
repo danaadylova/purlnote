@@ -6,7 +6,7 @@ import 'package:sqflite/sqflite.dart';
 import 'pending_edit.dart';
 
 /// Kinds of Ravelry records kept on the phone.
-enum RecordType { user, project, queuedProject, stash, projectStatus }
+enum RecordType { user, project, queuedProject, stash, projectStatus, libraryVolume }
 
 /// The on-phone database every screen reads from.
 ///
@@ -15,13 +15,16 @@ enum RecordType { user, project, queuedProject, stash, projectStatus }
 /// truth; this is a cache of the knitter's records plus each list's version
 /// tag (ETag) so refreshes are cheap. The knitter's own edits wait in the
 /// pending_edit table until they reach Ravelry.
+///
+/// It also holds what only the phone has: pattern files, reading spots,
+/// annotations and counters (see the library and reader stores).
 class LocalDatabase {
   LocalDatabase._(this._db);
 
   final Database _db;
 
   static const _fileName = 'purlnote.db';
-  static const _version = 2;
+  static const _version = 3;
 
   /// Opens (and if needed creates) the database.
   ///
@@ -36,9 +39,11 @@ class LocalDatabase {
         onCreate: (db, version) async {
           await _createVersion1(db);
           await _addPendingEdits(db);
+          await _addPatternsAndReading(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) await _addPendingEdits(db);
+          if (oldVersion < 3) await _addPatternsAndReading(db);
         },
       ),
     );
@@ -83,6 +88,80 @@ class LocalDatabase {
         next_attempt_at INTEGER,
         problem         TEXT,
         created_at      INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  /// Version 3: pattern files and everything the reader keeps.
+  ///
+  /// A pattern is either a Ravelry library volume (key "volume:<id>") or a PDF
+  /// the knitter imported (key "import:<id>"). Annotations belong to a file's
+  /// SHA-256, so they survive a re-download of the same file.
+  static Future<void> _addPatternsAndReading(Database db) async {
+    await db.execute('''
+      CREATE TABLE imported_pattern (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        title      TEXT    NOT NULL,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE pattern_file (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        pattern_key   TEXT    NOT NULL,
+        label         TEXT    NOT NULL,
+        sort_order    INTEGER NOT NULL,
+        attachment_id INTEGER,
+        local_path    TEXT,
+        sha256        TEXT,
+        bytes         INTEGER,
+        added_at      INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE pattern_setting (
+        pattern_key   TEXT PRIMARY KEY,
+        awake_minutes INTEGER
+      )
+    ''');
+    // Which pattern a project uses, when it isn't linked on Ravelry.
+    await db.execute('''
+      CREATE TABLE project_pattern (
+        project_id  INTEGER PRIMARY KEY,
+        pattern_key TEXT    NOT NULL
+      )
+    ''');
+    // Where the knitter stopped reading, per file and per project (0 = none).
+    await db.execute('''
+      CREATE TABLE reading_position (
+        file_id    INTEGER NOT NULL,
+        project_id INTEGER NOT NULL,
+        page       INTEGER NOT NULL,
+        saved_at   INTEGER NOT NULL,
+        PRIMARY KEY (file_id, project_id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE annotation (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_sha256 TEXT    NOT NULL,
+        page        INTEGER NOT NULL,
+        kind        TEXT    NOT NULL,
+        geometry    TEXT    NOT NULL,
+        note_text   TEXT,
+        created_at  INTEGER NOT NULL,
+        updated_at  INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE counter (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id    INTEGER NOT NULL,
+        label         TEXT    NOT NULL,
+        value         INTEGER NOT NULL,
+        every_n_rows  INTEGER,
+        total_repeats INTEGER,
+        sort_order    INTEGER NOT NULL
       )
     ''');
   }
@@ -251,6 +330,10 @@ class LocalDatabase {
     await _db.delete('sync_state');
     await _db.delete('pending_edit');
   }
+
+  /// The underlying SQLite database, for the stores that keep the phone's
+  /// own data (library, reader).
+  Database get sqlite => _db;
 
   Future<void> close() => _db.close();
 }

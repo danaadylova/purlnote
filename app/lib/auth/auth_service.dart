@@ -48,6 +48,7 @@ class AuthService {
     OpenSignInPage? openSignInPage,
     DateTime Function()? clock,
     Random? random,
+    this.scopes = signInScopes,
   })  : _http = httpClient ?? http.Client(),
         _openSignInPage = openSignInPage ?? _openWithSystemBrowser,
         _now = clock ?? DateTime.now,
@@ -64,9 +65,21 @@ class AuthService {
   /// instead of starting their own.
   Future<Tokens>? _refreshInProgress;
 
+  /// What this sign-in asks Ravelry for.
+  final List<String> scopes;
+
   /// Only `offline` at sign-in, so the knitter stays signed in. PDF downloads
   /// and posting comments ask for their own permission when first used.
   static const signInScopes = ['offline'];
+
+  /// For downloading purchased PDFs. Ravelry gives these tokens a shorter
+  /// life and suggests keeping them apart from the main token, so they get
+  /// their own [AuthService] and token store.
+  static const pdfDownloadScopes = ['offline', 'library-pdf'];
+
+  /// For posting notes as project comments. Ravelry's comment permission also
+  /// covers private messages, which Purlnote never sends.
+  static const commentScopes = ['offline', 'message-write'];
 
   Future<bool> isSignedIn() async => await tokenStore.read() != null;
 
@@ -82,7 +95,7 @@ class AuthService {
         'response_type': 'code',
         'client_id': config.ravelryClientId,
         'redirect_uri': config.redirectUri,
-        'scope': signInScopes.join(' '),
+        'scope': scopes.join(' '),
         'state': state,
       },
     );

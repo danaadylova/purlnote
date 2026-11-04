@@ -43,6 +43,7 @@ class Project {
     this.statusId,
     this.size,
     this.notes,
+    this.patternId,
   });
 
   factory Project.fromJson(Map<String, dynamic> json) {
@@ -62,6 +63,7 @@ class Project {
       statusId: (json['project_status_id'] as num?)?.toInt(),
       size: _text(json['size']),
       notes: _text(json['notes']),
+      patternId: (json['pattern_id'] as num?)?.toInt(),
     );
   }
 
@@ -89,6 +91,9 @@ class Project {
 
   /// Public project notes. Only on the project's own page.
   final String? notes;
+
+  /// The Ravelry pattern being knitted, if it's in Ravelry's catalogue.
+  final int? patternId;
 
   bool get isOnTheNeedles => statusName == 'In progress';
 }

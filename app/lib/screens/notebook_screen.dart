@@ -30,7 +30,6 @@ class NotebookScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Semantics(header: true, child: const Text('Notebook')),
-        actions: [_AccountMenu(session: session)],
       ),
       body: RefreshIndicator(
         onRefresh: session.refresh,
@@ -279,47 +278,5 @@ class _LastUpdated extends StatelessWidget {
       message = 'Updated from Ravelry at $time. Pull down to update.';
     }
     return Text(message, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall);
-  }
-}
-
-class _AccountMenu extends StatelessWidget {
-  const _AccountMenu({required this.session});
-
-  final AppSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'Account',
-      icon: const Icon(Icons.account_circle_outlined),
-      onSelected: (choice) {
-        if (choice == 'sign_out') _confirmSignOut(context);
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text('Signed in as ${session.user?.username ?? ''}'),
-        ),
-        const PopupMenuItem<String>(value: 'sign_out', child: Text('Sign out')),
-      ],
-    );
-  }
-
-  Future<void> _confirmSignOut(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sign out of Ravelry?'),
-        content: const Text(
-          'Your projects, queue and stash are removed from this phone. '
-          'They come back when you sign in again.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sign out')),
-        ],
-      ),
-    );
-    if (confirmed == true) await session.signOut();
   }
 }

@@ -7,8 +7,12 @@ import 'data/local_database.dart';
 import 'data/outbox.dart';
 import 'data/pending_edit.dart';
 import 'data/sync_engine.dart';
+import 'library/library_models.dart';
+import 'library/library_store.dart';
+import 'library/pdf_files.dart';
 import 'ravelry/models.dart';
 import 'ravelry/ravelry_client.dart';
+import 'reader/reader_store.dart';
 
 /// Which part of the app the knitter sees.
 enum AppStage {
@@ -30,13 +34,27 @@ enum AppStage {
 /// Screens listen to this and rebuild when it changes. They read only what is
 /// stored here (loaded from the local database), so they work offline.
 class AppSession extends ChangeNotifier {
-  AppSession({required this.auth, required this.database, required this.sync});
+  AppSession({required this.auth, required this.database, required this.sync, this.pdfAuth, this.pdfFiles})
+      : library = LibraryStore(database),
+        reader = ReaderStore(database);
 
   final AuthService auth;
   final LocalDatabase database;
   final SyncEngine sync;
 
   Outbox get outbox => sync.outbox;
+
+  /// The separate sign-in for downloading purchased PDFs.
+  final AuthService? pdfAuth;
+
+  /// Downloads and imports PDFs. Null in tests that don't need it.
+  final PdfFiles? pdfFiles;
+
+  final LibraryStore library;
+  final ReaderStore reader;
+
+  /// Every pattern in the library, purchases and imports together.
+  List<LibraryPattern> patterns = const [];
 
   AppStage stage = AppStage.starting;
 
@@ -144,6 +162,7 @@ class AppSession extends ChangeNotifier {
   /// this phone. The Ravelry records come back on the next sign-in.
   Future<void> signOut() async {
     await auth.signOut();
+    await pdfAuth?.signOut();
     await database.clearRavelryData();
     await _loadFromDatabase();
     _moveTo(AppStage.signedOut);
@@ -158,6 +177,7 @@ class AppSession extends ChangeNotifier {
     projectStatuses = (await database.records(RecordType.projectStatus)).map(ProjectStatus.fromJson).toList();
     pendingEdits = await database.pendingEdits();
     lastSyncedAt = await database.lastSyncedAt();
+    patterns = await library.patterns();
   }
 
   // Editing ---------------------------------------------------------------
@@ -234,6 +254,107 @@ class AppSession extends ChangeNotifier {
     final others = projects.where((project) => !project.isOnTheNeedles).toList();
     others.sort((a, b) => (b.updatedAt ?? DateTime(0)).compareTo(a.updatedAt ?? DateTime(0)));
     return others;
+  }
+
+  // Library ---------------------------------------------------------------
+
+  LibraryPattern? patternByKey(String key) => patterns.where((pattern) => pattern.key == key).firstOrNull;
+
+  /// The library pattern a project is knitting: one linked on this phone, or
+  /// a purchase of the same Ravelry pattern.
+  Future<LibraryPattern?> patternForProject(Project project) async {
+    final linkedKey = await library.linkedPatternKey(project.id);
+    if (linkedKey != null) return patternByKey(linkedKey);
+    final patternId = project.patternId;
+    if (patternId == null) return null;
+    return patterns.where((pattern) => pattern.ravelryPatternId == patternId).firstOrNull;
+  }
+
+  /// Ties an imported pattern (or any library pattern) to a project, so the
+  /// project opens it.
+  Future<void> linkProjectToPattern(int projectId, String patternKey) async {
+    await library.linkProject(projectId, patternKey);
+    notifyListeners();
+  }
+
+  /// Fetches the list of PDFs in a purchase. Offline, keeps what's known.
+  Future<void> loadPurchaseFiles(LibraryPattern pattern) async {
+    final volumeId = LibraryPattern.volumeIdOf(pattern.key);
+    final files = pdfFiles;
+    if (volumeId == null || files == null) return;
+    try {
+      await files.loadPurchaseFiles(volumeId);
+    } on RavelryUnreachable {
+      return;
+    } on RavelryError {
+      return;
+    } on SignInExpired {
+      return;
+    }
+    await _reloadLibrary();
+  }
+
+  /// Whether the knitter has allowed Purlnote to download purchased PDFs.
+  Future<bool> canDownloadPdfs() async => await pdfAuth?.isSignedIn() ?? false;
+
+  /// Asks Ravelry for permission to download purchased PDFs. Returns a
+  /// message to show if it didn't work, or null if it did.
+  Future<String?> allowPdfDownloads() async {
+    final pdfSignIn = pdfAuth;
+    if (pdfSignIn == null) return 'PDF downloads aren\'t available in this build.';
+    try {
+      await pdfSignIn.signIn();
+      return null;
+    } on SignInCancelled {
+      return 'PDF downloads weren\'t allowed.';
+    } on SignInFailed catch (failure) {
+      return failure.message;
+    }
+  }
+
+  /// Downloads one purchased PDF. Returns a message to show if it couldn't.
+  Future<String?> downloadFile(PatternFile file) async {
+    final files = pdfFiles;
+    if (files == null) return 'PDF downloads aren\'t available in this build.';
+    try {
+      await files.download(file);
+    } on DownloadLimitReached {
+      return 'Ravelry\'s daily download limit is reached. Try again tomorrow; files already on this phone still open.';
+    } on NeedsPdfPermission {
+      return 'Allow PDF downloads first.';
+    } on RavelryUnreachable {
+      return 'You\'re offline. Download it when you\'re connected.';
+    } on RavelryError catch (error) {
+      return 'Ravelry couldn\'t provide this file (error ${error.statusCode}).';
+    } finally {
+      await _reloadLibrary();
+    }
+    return null;
+  }
+
+  /// Imports a PDF from Files. Returns the pattern it went into, or null if
+  /// cancelled. Throws [ImportRefused] with a message for bad files.
+  Future<LibraryPattern?> importPdf({String? addToPattern}) async {
+    final files = pdfFiles;
+    if (files == null) return null;
+    final key = await files.importFromFiles(addToPattern: addToPattern);
+    await _reloadLibrary();
+    return key == null ? null : patternByKey(key);
+  }
+
+  Future<void> renameImportedPattern(String key, String title) async {
+    await library.renameImportedPattern(key, title);
+    await _reloadLibrary();
+  }
+
+  Future<void> renameFile(int fileId, String label) async {
+    await library.renameFile(fileId, label);
+    await _reloadLibrary();
+  }
+
+  Future<void> _reloadLibrary() async {
+    patterns = await library.patterns();
+    notifyListeners();
   }
 
   void _moveTo(AppStage next) {

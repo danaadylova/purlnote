@@ -18,6 +18,18 @@ dependencies:
   # The local database every screen reads from.
   sqflite: ^2.4.1
   path: ^1.9.0
+  # Where downloaded and imported PDFs are kept.
+  path_provider: ^2.1.5
+  # The fingerprint (SHA-256) that ties notes to a PDF.
+  crypto: ^3.0.6
+  # Draws PDF pages, and reads their text for step-by-step.
+  pdfrx: ^2.11.0
+  # Importing a PDF from Files.
+  file_picker: ^13.3.2
+  # Keeps the screen on while reading.
+  wakelock_plus: ^1.3.2
+  # Opens Ravelry pages in the browser.
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -25,6 +37,8 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   # Runs the same SQLite database in tests on a plain computer.
   sqflite_common_ffi: ^2.3.4
+  # Lets tests move time forward, for the screen-awake timer.
+  fake_async: ^1.3.1
 
 flutter:
   uses-material-design: true

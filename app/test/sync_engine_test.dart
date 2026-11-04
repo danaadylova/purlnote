@@ -24,11 +24,17 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('the first sync stores profile, projects, queue and stash in order', () async {
+  test('the first sync stores profile, projects, queue, stash and library in order', () async {
     final progress = <SyncStep, int>{};
     await engine.syncEverything(onProgress: (step, count) => progress[step] = count);
 
-    expect(progress, {SyncStep.profile: 1, SyncStep.projects: 2, SyncStep.queue: 1, SyncStep.stash: 1});
+    expect(progress, {
+      SyncStep.profile: 1,
+      SyncStep.projects: 2,
+      SyncStep.queue: 1,
+      SyncStep.stash: 1,
+      SyncStep.library: 1,
+    });
     expect((await database.records(RecordType.user)).single['username'], 'unraveled-makes');
     expect((await database.records(RecordType.project)).map((p) => p['name']), ['Harbour Raglan', 'Petal Drop Socks']);
     expect((await database.records(RecordType.stash)).single['id'], 30);

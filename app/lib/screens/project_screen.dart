@@ -6,6 +6,8 @@ import '../ravelry/models.dart';
 import '../theme.dart';
 import '../widgets/edit_widgets.dart';
 import '../widgets/project_widgets.dart';
+import '../library/library_models.dart';
+import '../reader/reader_screen.dart';
 import 'edit_conflict_screen.dart';
 import 'project_edit_screen.dart';
 
@@ -95,6 +97,8 @@ class _ProjectDetails extends StatelessWidget {
             ProgressRow(percent: progress),
           ],
           const SizedBox(height: 20),
+          _OpenPatternButton(session: session, project: project),
+          const SizedBox(height: 12),
           _Detail(label: 'Pattern', value: project.patternName),
           _Detail(label: 'Craft', value: project.craftName),
           _Detail(label: 'Size', value: project.size),
@@ -140,5 +144,62 @@ class _Detail extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Opens the project's pattern in the reader, with this project's counters
+/// and saved spot. If the pattern isn't known, offers to pick one from the
+/// library (for example a PDF bought elsewhere and imported).
+class _OpenPatternButton extends StatelessWidget {
+  const _OpenPatternButton({required this.session, required this.project});
+
+  final AppSession session;
+  final Project project;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<LibraryPattern?>(
+      future: session.patternForProject(project),
+      builder: (context, snapshot) {
+        final pattern = snapshot.data;
+        if (pattern != null && pattern.isOnPhone) {
+          return FilledButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => ReaderScreen(session: session, pattern: pattern, projectId: project.id),
+            )),
+            icon: const Icon(Icons.menu_book_outlined),
+            label: const Text('Open pattern'),
+          );
+        }
+        return OutlinedButton.icon(
+          onPressed: () => _choosePattern(context),
+          icon: const Icon(Icons.link),
+          label: Text(pattern == null ? 'Choose the pattern PDF' : 'Download the pattern in Library'),
+        );
+      },
+    );
+  }
+
+  Future<void> _choosePattern(BuildContext context) async {
+    final onPhone = session.patterns.where((pattern) => pattern.isOnPhone).toList();
+    final chosen = await showModalBottomSheet<LibraryPattern>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: onPhone.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text('No patterns on this phone yet. Download or import one in Library first.'),
+              )
+            : ListView(
+                shrinkWrap: true,
+                children: [
+                  const ListTile(title: Text('Which pattern is this project using?')),
+                  for (final pattern in onPhone)
+                    ListTile(title: Text(pattern.title), onTap: () => Navigator.pop(context, pattern)),
+                ],
+              ),
+      ),
+    );
+    if (chosen != null) await session.linkProjectToPattern(project.id, chosen.key);
   }
 }

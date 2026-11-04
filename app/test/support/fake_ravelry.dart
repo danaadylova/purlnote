@@ -38,6 +38,9 @@ class FakeRavelry {
       'yarn': {'name': 'Rios', 'yarn_company_name': 'Malabrigo'},
     },
   ];
+  List<Map<String, dynamic>> library = [
+    {'id': 70, 'title': 'Harbour Raglan', 'author_name': 'A. Designer', 'pattern_id': 500, 'has_downloads': true},
+  ];
   List<Map<String, dynamic>> projectStatuses = [
     {'id': 1, 'name': 'In progress'},
     {'id': 2, 'name': 'Finished'},
@@ -77,6 +80,7 @@ class FakeRavelry {
     if (path == '/people/unraveled-makes/queue/list.json') return _withTag(request, {'queued_projects': queue});
     if (path == '/people/unraveled-makes/stash/list.json') return _stashPage(request);
     if (path == '/projects/project_statuses.json') return _withTag(request, {'project_statuses': projectStatuses});
+    if (path == '/people/unraveled-makes/library/search.json') return _withTag(request, {'volumes': library});
 
     final project = RegExp(r'^/projects/unraveled-makes/(\d+)\.json$').firstMatch(path);
     if (project != null) return _recordPage(request, projects, int.parse(project.group(1)!), 'project');

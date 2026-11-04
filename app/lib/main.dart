@@ -7,9 +7,11 @@ import 'config.dart';
 import 'data/local_database.dart';
 import 'data/outbox.dart';
 import 'data/sync_engine.dart';
+import 'library/library_store.dart';
+import 'library/pdf_files.dart';
 import 'ravelry/ravelry_client.dart';
 import 'screens/first_sync_screen.dart';
-import 'screens/notebook_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'theme.dart';
 
@@ -21,8 +23,24 @@ Future<void> main() async {
   final auth = AuthService(config: config, tokenStore: SecureTokenStore());
   final database = await LocalDatabase.open();
   final ravelry = RavelryClient(baseUrl: config.ravelryApiUrl, auth: auth);
+
+  // Purchased PDFs use their own sign-in: Ravelry's PDF permission comes with
+  // shorter-lived tokens, so they're kept apart from the main ones.
+  final pdfAuth = AuthService(
+    config: config,
+    tokenStore: SecureTokenStore(name: 'ravelry_pdf'),
+    scopes: AuthService.pdfDownloadScopes,
+  );
+  final pdfFiles = PdfFiles(
+    library: LibraryStore(database),
+    ravelry: ravelry,
+    pdfRavelry: RavelryClient(baseUrl: config.ravelryApiUrl, auth: pdfAuth),
+  );
+
   final session = AppSession(
     auth: auth,
+    pdfAuth: pdfAuth,
+    pdfFiles: pdfFiles,
     database: database,
     sync: SyncEngine(
       ravelry: ravelry,
@@ -54,7 +72,7 @@ class PurlnoteApp extends StatelessWidget {
           AppStage.starting => const _Launching(),
           AppStage.signedOut => WelcomeScreen(session: session),
           AppStage.firstSync => FirstSyncScreen(session: session),
-          AppStage.ready => NotebookScreen(session: session),
+          AppStage.ready => HomeScreen(session: session),
         },
       ),
     );
