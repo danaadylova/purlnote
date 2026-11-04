@@ -268,7 +268,7 @@ export async function probePdf(api, username) {
 }
 
 // Posts one public test comment on the first project whose name contains the
-// given text. Dana deletes it afterwards (the app will offer delete later).
+// given text. Delete it on Ravelry afterwards.
 export async function probeComment(api, username, nameContains) {
   const wanted = (nameContains || "").trim().toLowerCase();
   if (!wanted) return [false, "No project name was given, so no comment was posted"];
@@ -295,7 +295,7 @@ function renderResults(results) {
     })
     .join("");
   return `<table><thead><tr><th scope="col">Check</th><th scope="col">Result</th><th scope="col">Detail</th></tr></thead><tbody>${rows}</tbody></table>
-<p>Copy this table into the chat with Claude. Nothing here is a secret.</p><p><a href="/spike">Run again</a></p>`;
+<p>Nothing in this table is a secret, so it is safe to share.</p><p><a href="/spike">Run again</a></p>`;
 }
 
 export function scrub(text, secrets) {
