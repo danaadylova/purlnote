@@ -5,6 +5,7 @@ import 'auth/auth_service.dart';
 import 'auth/tokens.dart';
 import 'config.dart';
 import 'data/local_database.dart';
+import 'data/outbox.dart';
 import 'data/sync_engine.dart';
 import 'ravelry/ravelry_client.dart';
 import 'screens/first_sync_screen.dart';
@@ -23,7 +24,11 @@ Future<void> main() async {
   final session = AppSession(
     auth: auth,
     database: database,
-    sync: SyncEngine(ravelry: ravelry, database: database),
+    sync: SyncEngine(
+      ravelry: ravelry,
+      database: database,
+      outbox: Outbox(ravelry: ravelry, database: database),
+    ),
   );
 
   runApp(PurlnoteApp(session: session));

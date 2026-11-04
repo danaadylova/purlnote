@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'auth/auth_service.dart';
 import 'data/local_database.dart';
+import 'data/outbox.dart';
+import 'data/pending_edit.dart';
 import 'data/sync_engine.dart';
 import 'ravelry/models.dart';
 import 'ravelry/ravelry_client.dart';
@@ -32,12 +36,18 @@ class AppSession extends ChangeNotifier {
   final LocalDatabase database;
   final SyncEngine sync;
 
+  Outbox get outbox => sync.outbox;
+
   AppStage stage = AppStage.starting;
 
   RavelryUser? user;
   List<Project> projects = const [];
   List<QueuedProject> queue = const [];
   List<StashYarn> stash = const [];
+  List<ProjectStatus> projectStatuses = const [];
+
+  /// The knitter's edits that haven't reached Ravelry yet.
+  List<PendingEdit> pendingEdits = const [];
   DateTime? lastSyncedAt;
 
   /// True while a sync is running.
@@ -121,6 +131,8 @@ class AppSession extends ChangeNotifier {
       syncProblem = "You're offline. Showing what's on this phone.";
     } on RavelryError catch (error) {
       syncProblem = 'Ravelry had a problem (${error.statusCode}). Showing what\'s on this phone.';
+    } on SignInFailed catch (failure) {
+      syncProblem = failure.message;
     } finally {
       isSyncing = false;
       await _loadFromDatabase();
@@ -128,8 +140,8 @@ class AppSession extends ChangeNotifier {
     }
   }
 
-  /// Forgets the Ravelry sign-in and the copied records on this phone. All of
-  /// it comes back on the next sign-in.
+  /// Forgets the Ravelry sign-in, the copied records and any unsent edits on
+  /// this phone. The Ravelry records come back on the next sign-in.
   Future<void> signOut() async {
     await auth.signOut();
     await database.clearRavelryData();
@@ -143,7 +155,76 @@ class AppSession extends ChangeNotifier {
     projects = (await database.records(RecordType.project)).map(Project.fromJson).toList();
     queue = (await database.records(RecordType.queuedProject)).map(QueuedProject.fromJson).toList();
     stash = (await database.records(RecordType.stash)).map(StashYarn.fromJson).toList();
+    projectStatuses = (await database.records(RecordType.projectStatus)).map(ProjectStatus.fromJson).toList();
+    pendingEdits = await database.pendingEdits();
     lastSyncedAt = await database.lastSyncedAt();
+  }
+
+  // Editing ---------------------------------------------------------------
+
+  Project? projectById(int id) => projects.where((project) => project.id == id).firstOrNull;
+
+  StashYarn? stashById(int id) => stash.where((yarn) => yarn.id == id).firstOrNull;
+
+  /// The unsent edit for one record, if any.
+  PendingEdit? pendingEditFor(RecordType type, int ravelryId) {
+    return pendingEdits.where((edit) => edit.recordType == type && edit.ravelryId == ravelryId).firstOrNull;
+  }
+
+  /// Edits that need the knitter to choose between their version and Ravelry's.
+  List<PendingEdit> get conflicts =>
+      pendingEdits.where((edit) => edit.state == PendingEditState.conflict).toList();
+
+  /// Edits Ravelry refused for good.
+  List<PendingEdit> get failedEdits => pendingEdits.where((edit) => edit.state == PendingEditState.failed).toList();
+
+  /// Loads a project's or yarn's full details (notes, size and so on) before
+  /// showing or editing it. Offline, the stored copy is used as it is.
+  Future<void> loadFullRecord(RecordType type, int ravelryId) async {
+    try {
+      await sync.refreshRecord(type, ravelryId);
+    } on RavelryUnreachable {
+      return;
+    } on RavelryError {
+      return;
+    } on SignInFailed {
+      return;
+    } on SignInExpired {
+      return;
+    }
+    await _loadFromDatabase();
+    notifyListeners();
+  }
+
+  /// Saves an edit on the phone at once, then tries to send it to Ravelry.
+  /// See [Outbox.saveEdit] for [changes] and [displayFields].
+  Future<void> saveEdit(
+    RecordType type,
+    int ravelryId,
+    Map<String, Object?> changes, {
+    Map<String, Object?> displayFields = const {},
+  }) async {
+    if (changes.isEmpty) return;
+    await outbox.saveEdit(type: type, ravelryId: ravelryId, changes: changes, displayFields: displayFields);
+    await _loadFromDatabase();
+    notifyListeners();
+    // The knitter can carry on while it sends.
+    unawaited(refresh());
+  }
+
+  /// Applies the knitter's choices for a conflict, then sends the result.
+  Future<void> resolveConflict(PendingEdit edit, Map<String, ConflictChoice> choices) async {
+    await outbox.resolveConflict(edit, choices);
+    await _loadFromDatabase();
+    notifyListeners();
+    unawaited(refresh());
+  }
+
+  /// Drops an edit that won't be sent, putting the old values back.
+  Future<void> discardEdit(PendingEdit edit) async {
+    await outbox.discard(edit);
+    await _loadFromDatabase();
+    notifyListeners();
   }
 
   /// Projects with status "In progress", for the top of the Notebook.

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../app_session.dart';
+import '../data/local_database.dart';
+import '../data/pending_edit.dart';
 import '../ravelry/models.dart';
 import '../theme.dart';
 import '../widgets/project_widgets.dart';
+import 'edit_conflict_screen.dart';
 import 'project_screen.dart';
 import 'queue_screen.dart';
 import 'stash_screen.dart';
@@ -35,6 +38,11 @@ class NotebookScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [
             if (session.syncProblem != null) _Banner(message: session.syncProblem!),
+            for (final edit in session.conflicts)
+              _ConflictBanner(
+                recordName: _recordName(edit),
+                onTap: () => _push(context, EditConflictScreen(session: session, edit: edit)),
+              ),
             _SectionTitle('On the needles', count: onTheNeedles.length),
             if (onTheNeedles.isEmpty)
               const _Empty('Nothing on the needles. Projects marked "In progress" on Ravelry show up here.')
@@ -44,7 +52,7 @@ class NotebookScreen extends StatelessWidget {
             const SizedBox(height: 8),
             _StashShortcut(
               yarnCount: session.stash.length,
-              onTap: () => _push(context, StashScreen(stash: session.stash)),
+              onTap: () => _push(context, StashScreen(session: session)),
             ),
             _SectionTitle('Queue', count: queue.length),
             if (queue.isEmpty)
@@ -70,8 +78,17 @@ class NotebookScreen extends StatelessWidget {
     );
   }
 
+  /// The project or yarn a pending edit belongs to, by name.
+  String _recordName(PendingEdit edit) {
+    return switch (edit.recordType) {
+      RecordType.project => session.projectById(edit.ravelryId)?.name,
+      RecordType.stash => session.stashById(edit.ravelryId)?.name,
+      _ => null,
+    } ?? 'An item';
+  }
+
   void _openProject(BuildContext context, Project project) {
-    _push(context, ProjectScreen(project: project, username: session.user?.username));
+    _push(context, ProjectScreen(session: session, projectId: project.id));
   }
 
   void _push(BuildContext context, Widget screen) {
@@ -180,6 +197,40 @@ class _OtherProjectRow extends StatelessWidget {
       title: Text(project.name),
       subtitle: project.patternName == null ? null : Text(project.patternName!),
       trailing: status == null ? null : StatusChip(status: status),
+    );
+  }
+}
+
+/// Shown for each edit that was also changed on Ravelry.
+class _ConflictBanner extends StatelessWidget {
+  const _ConflictBanner({required this.recordName, required this.onTap});
+
+  final String recordName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: PurlnoteColors.blush,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                const Icon(Icons.call_split, size: 20, color: PurlnoteColors.plum),
+                const SizedBox(width: 10),
+                Expanded(child: Text('$recordName was also changed on Ravelry. Choose which version to keep.')),
+                const Icon(Icons.chevron_right, color: PurlnoteColors.plum),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

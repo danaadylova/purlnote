@@ -30,11 +30,14 @@ class RavelryError implements Exception {
   final int statusCode;
   final String path;
 
+  /// Ravelry is busy or having trouble; trying again later may work.
+  bool get isTemporary => statusCode == 429 || statusCode >= 500;
+
   @override
   String toString() => 'Ravelry answered $statusCode for $path';
 }
 
-/// Reads from Ravelry's API with the knitter's access token.
+/// Reads from and writes to Ravelry's API with the knitter's access token.
 ///
 /// Everything except sign-in goes straight from the phone to Ravelry; our
 /// sign-in function never sees the knitter's data.
@@ -79,6 +82,39 @@ class RavelryClient {
       etag: newEtag,
       unchanged: false,
     );
+  }
+
+  /// POSTs [body] as JSON to [path] (such as an update to a project) and
+  /// returns Ravelry's reply. Like [get], refreshes the token once on 401.
+  Future<Map<String, dynamic>> post(String path, Map<String, Object?> body) async {
+    final url = Uri.parse('$baseUrl$path');
+    final json = jsonEncode(body);
+
+    var response = await _sendPost(url, await auth.accessToken(), json);
+    if (response.statusCode == 401) {
+      final fresh = await auth.refresh();
+      response = await _sendPost(url, fresh.accessToken, json);
+    }
+    if (response.statusCode != 200) {
+      throw RavelryError(response.statusCode, path);
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<http.Response> _sendPost(Uri url, String accessToken, String json) async {
+    try {
+      return await _http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: json,
+      );
+    } on Exception {
+      throw const RavelryUnreachable();
+    }
   }
 
   Future<http.Response> _send(Uri url, String accessToken, String? etag) async {

@@ -1,5 +1,6 @@
 import '../ravelry/ravelry_client.dart';
 import 'local_database.dart';
+import 'outbox.dart';
 
 /// The parts of a sync, in the order they run.
 enum SyncStep {
@@ -17,18 +18,23 @@ enum SyncStep {
 /// Called after each step with how many records it stored.
 typedef SyncProgress = void Function(SyncStep step, int count);
 
-/// Copies the knitter's Ravelry records into the local database.
+/// Keeps the local database and Ravelry in step.
 ///
-/// This is the only part of the app that reads from Ravelry for the Notebook.
-/// Each list remembers Ravelry's version tag (ETag), so when nothing changed a
+/// A sync sends the knitter's waiting edits first, then copies their lists
+/// from Ravelry, then lays any edits that couldn't be sent back on top. Each
+/// list remembers Ravelry's version tag (ETag), so when nothing changed a
 /// refresh costs one small "unchanged" reply instead of the whole list.
 class SyncEngine {
-  SyncEngine({required this.ravelry, required this.database, DateTime Function()? clock})
+  SyncEngine({required this.ravelry, required this.database, required this.outbox, DateTime Function()? clock})
       : _now = clock ?? DateTime.now;
 
   final RavelryClient ravelry;
   final LocalDatabase database;
+  final Outbox outbox;
   final DateTime Function() _now;
+
+  /// How the last round of sending edits went, for the Notebook to report.
+  SendResult lastSend = const SendResult();
 
   /// Records per page when a list is long enough to need paging.
   static const pageSize = 100;
@@ -38,10 +44,13 @@ class SyncEngine {
   static const maxPages = 50;
 
   /// Runs every step. Throws [RavelryUnreachable] when offline; what was
-  /// stored before stays on screen.
+  /// stored before stays on screen, along with the knitter's unsent edits.
   Future<void> syncEverything({SyncProgress? onProgress}) async {
     final username = await _syncProfile();
     onProgress?.call(SyncStep.profile, 1);
+
+    lastSend = await outbox.sendAll(username: username);
+    if (lastSend.offline) throw const RavelryUnreachable();
 
     final listsByStep = {
       SyncStep.projects: _RavelryList(
@@ -65,10 +74,36 @@ class SyncEngine {
       ),
     };
 
-    for (final entry in listsByStep.entries) {
-      final count = await _syncList(entry.value);
-      onProgress?.call(entry.key, count);
+    try {
+      for (final entry in listsByStep.entries) {
+        final count = await _syncList(entry.value);
+        onProgress?.call(entry.key, count);
+      }
+      // The names of project statuses, for the status picker when editing.
+      await _syncList(const _RavelryList(
+        name: 'project_statuses',
+        path: '/projects/project_statuses.json',
+        resultKey: 'project_statuses',
+        recordType: RecordType.projectStatus,
+      ));
+    } finally {
+      await outbox.reapplyPendingEdits();
     }
+  }
+
+  /// Reads one project or stash record in full from Ravelry and stores it.
+  ///
+  /// Lists leave out some fields (a project's notes and size, for example),
+  /// so this runs before editing. Offline it throws [RavelryUnreachable] and
+  /// the stored record is used instead.
+  Future<void> refreshRecord(RecordType type, int ravelryId) async {
+    final users = await database.records(RecordType.user);
+    if (users.isEmpty) return;
+    final path = Outbox.recordPath(type, users.first['username'] as String, ravelryId);
+    final reply = await ravelry.get(path);
+    final record = reply.body![type == RecordType.stash ? 'stash' : 'project'] as Map<String, dynamic>;
+    await database.updateRecord(type, ravelryId, record, _now());
+    await outbox.reapplyPendingEdits();
   }
 
   /// Stores the signed-in knitter and returns their username.

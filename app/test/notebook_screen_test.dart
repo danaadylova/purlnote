@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:purlnote/app_session.dart';
 import 'package:purlnote/data/local_database.dart';
-import 'package:purlnote/data/sync_engine.dart';
-import 'package:purlnote/ravelry/ravelry_client.dart';
 import 'package:purlnote/screens/notebook_screen.dart';
 import 'package:purlnote/screens/welcome_screen.dart';
 import 'package:purlnote/theme.dart';
@@ -18,11 +16,7 @@ void main() {
     final session = AppSession(
       auth: auth,
       database: database,
-      sync: SyncEngine(
-        ravelry: RavelryClient(baseUrl: testConfig.ravelryApiUrl, auth: auth, httpClient: ravelry.client),
-        database: database,
-        clock: () => testNow,
-      ),
+      sync: syncEngineFor(ravelryHttp: ravelry.client, database: database, auth: auth),
     );
     // A first sign-in waits on the first-sync screen until the knitter taps
     // "Open my notebook".

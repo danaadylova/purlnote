@@ -1,27 +1,88 @@
 import 'package:flutter/material.dart';
 
+import '../app_session.dart';
+import '../data/local_database.dart';
 import '../ravelry/models.dart';
 import '../theme.dart';
+import '../widgets/edit_widgets.dart';
 import '../widgets/project_widgets.dart';
+import 'edit_conflict_screen.dart';
+import 'project_edit_screen.dart';
 
-/// One project, read-only. Editing arrives in milestone 2.
-class ProjectScreen extends StatelessWidget {
-  const ProjectScreen({super.key, required this.project, this.username});
+/// One project: its details, and an Edit button.
+///
+/// Opens with what's stored on the phone, then loads the full project (notes
+/// and size aren't in Ravelry's project list) when online.
+class ProjectScreen extends StatefulWidget {
+  const ProjectScreen({super.key, required this.session, required this.projectId});
 
+  final AppSession session;
+  final int projectId;
+
+  @override
+  State<ProjectScreen> createState() => _ProjectScreenState();
+}
+
+class _ProjectScreenState extends State<ProjectScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.session.loadFullRecord(RecordType.project, widget.projectId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.session,
+      builder: (context, _) {
+        final project = widget.session.projectById(widget.projectId);
+        if (project == null) {
+          return Scaffold(appBar: AppBar(), body: const Center(child: Text('This project is no longer on Ravelry.')));
+        }
+        return _ProjectDetails(session: widget.session, project: project);
+      },
+    );
+  }
+}
+
+class _ProjectDetails extends StatelessWidget {
+  const _ProjectDetails({required this.session, required this.project});
+
+  final AppSession session;
   final Project project;
-  final String? username;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final status = project.statusName;
     final progress = project.progressPercent;
+    final pendingEdit = session.pendingEditFor(RecordType.project, project.id);
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          TextButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => ProjectEditScreen(session: session, project: project),
+            )),
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Edit'),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
         children: [
+          if (pendingEdit != null) ...[
+            PendingEditNotice(
+              edit: pendingEdit,
+              onResolve: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => EditConflictScreen(session: session, edit: pendingEdit),
+              )),
+              onDiscard: () => session.discardEdit(pendingEdit),
+            ),
+            const SizedBox(height: 16),
+          ],
           ProjectPhoto(url: project.photoUrl, size: 120),
           const SizedBox(height: 16),
           Semantics(header: true, child: Text(project.name, style: text.headlineMedium)),
@@ -36,8 +97,15 @@ class ProjectScreen extends StatelessWidget {
           const SizedBox(height: 20),
           _Detail(label: 'Pattern', value: project.patternName),
           _Detail(label: 'Craft', value: project.craftName),
+          _Detail(label: 'Size', value: project.size),
           _Detail(label: 'Started', value: _formatDate(context, project.started)),
           _Detail(label: 'Finished', value: _formatDate(context, project.completed)),
+          if (project.notes != null) ...[
+            const SizedBox(height: 16),
+            Semantics(header: true, child: Text('Notes', style: text.titleMedium)),
+            const SizedBox(height: 6),
+            Text(project.notes!, style: const TextStyle(fontSize: 16, height: 1.45)),
+          ],
         ],
       ),
     );

@@ -6,8 +6,11 @@ import 'package:http/testing.dart';
 import 'package:purlnote/auth/auth_service.dart';
 import 'package:purlnote/auth/tokens.dart';
 import 'package:purlnote/config.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:purlnote/data/local_database.dart';
+import 'package:purlnote/data/outbox.dart';
+import 'package:purlnote/data/sync_engine.dart';
+import 'package:purlnote/ravelry/ravelry_client.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const testConfig = AppConfig(
   ravelryClientId: 'test-client-id',
@@ -45,4 +48,21 @@ Future<LocalDatabase> emptyDatabase() {
   sqfliteFfiInit();
   final folder = Directory.systemTemp.createTempSync('purlnote_test_');
   return LocalDatabase.open(factory: databaseFactoryFfi, path: '${folder.path}/test.db');
+}
+
+/// A sync engine (with its outbox) talking to [ravelryHttp] on the test clock.
+SyncEngine syncEngineFor({
+  required http.Client ravelryHttp,
+  required LocalDatabase database,
+  required AuthService auth,
+  DateTime Function()? clock,
+}) {
+  final ravelry = RavelryClient(baseUrl: testConfig.ravelryApiUrl, auth: auth, httpClient: ravelryHttp);
+  final now = clock ?? () => testNow;
+  return SyncEngine(
+    ravelry: ravelry,
+    database: database,
+    outbox: Outbox(ravelry: ravelry, database: database, clock: now),
+    clock: now,
+  );
 }

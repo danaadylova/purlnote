@@ -40,6 +40,9 @@ class Project {
     this.completed,
     this.photoUrl,
     this.updatedAt,
+    this.statusId,
+    this.size,
+    this.notes,
   });
 
   factory Project.fromJson(Map<String, dynamic> json) {
@@ -56,6 +59,9 @@ class Project {
       completed: _date(json['completed']),
       photoUrl: photo == null ? null : _text(photo['small_url']) ?? _text(photo['square_url']),
       updatedAt: _date(json['updated_at']),
+      statusId: (json['project_status_id'] as num?)?.toInt(),
+      size: _text(json['size']),
+      notes: _text(json['notes']),
     );
   }
 
@@ -74,6 +80,15 @@ class Project {
   final DateTime? completed;
   final String? photoUrl;
   final DateTime? updatedAt;
+
+  /// Ravelry's ID for [statusName]; what an edit sends.
+  final int? statusId;
+
+  /// Only on the project's own page, not in the project list.
+  final String? size;
+
+  /// Public project notes. Only on the project's own page.
+  final String? notes;
 
   bool get isOnTheNeedles => statusName == 'In progress';
 }
@@ -108,16 +123,27 @@ class StashYarn {
     this.colorway,
     this.weightName,
     this.companyName,
+    this.location,
+    this.notes,
+    this.dyeLot,
+    this.status = StashStatus.inStash,
   });
 
   factory StashYarn.fromJson(Map<String, dynamic> json) {
     final yarn = json['yarn'] as Map<String, dynamic>?;
+    // Ravelry sends the status as an object; an edit on the phone stores the ID.
+    final statusId = (json['stash_status_id'] as num?)?.toInt() ??
+        ((json['stash_status'] as Map<String, dynamic>?)?['id'] as num?)?.toInt();
     return StashYarn(
       id: json['id'] as int,
       name: _text(yarn?['name']) ?? _text(json['name']) ?? 'Unnamed yarn',
       colorway: _text(json['colorway_name']),
       weightName: _text(json['yarn_weight_name']),
       companyName: _text(yarn?['yarn_company_name']),
+      location: _text(json['location']),
+      notes: _text(json['notes']),
+      dyeLot: _text(json['dye_lot']),
+      status: StashStatus.fromId(statusId),
     );
   }
 
@@ -126,6 +152,43 @@ class StashYarn {
   final String? colorway;
   final String? weightName;
   final String? companyName;
+
+  /// Where the yarn is kept, such as "Blue bin under the bed".
+  final String? location;
+  final String? notes;
+  final String? dyeLot;
+  final StashStatus status;
+}
+
+/// A stash yarn's status. Ravelry's IDs are fixed, so they live here.
+enum StashStatus {
+  inStash(1, 'In stash'),
+  usedUp(2, 'Used up'),
+  forTradeOrSale(3, 'Will trade or sell'),
+  gone(4, 'Gone or sold');
+
+  const StashStatus(this.ravelryId, this.label);
+
+  final int ravelryId;
+  final String label;
+
+  /// Unknown or missing IDs count as "In stash".
+  static StashStatus fromId(int? id) {
+    return values.firstWhere((status) => status.ravelryId == id, orElse: () => inStash);
+  }
+}
+
+/// A project status Ravelry knows, such as "Hibernating". Synced from Ravelry
+/// because the list and its IDs belong to Ravelry.
+class ProjectStatus {
+  const ProjectStatus({required this.id, required this.name});
+
+  factory ProjectStatus.fromJson(Map<String, dynamic> json) {
+    return ProjectStatus(id: json['id'] as int, name: _text(json['name']) ?? 'Status ${json['id']}');
+  }
+
+  final int id;
+  final String name;
 }
 
 /// Ravelry sends empty strings for many unset fields; treat them as missing.

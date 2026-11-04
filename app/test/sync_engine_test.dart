@@ -19,11 +19,7 @@ void main() {
     final auth = await signedInAuth(
       signInFunction: MockClient((_) async => jsonReply({'access_token': 'access-2', 'expires_in': 3600})),
     );
-    engine = SyncEngine(
-      ravelry: RavelryClient(baseUrl: testConfig.ravelryApiUrl, auth: auth, httpClient: ravelry.client),
-      database: database,
-      clock: () => testNow,
-    );
+    engine = syncEngineFor(ravelryHttp: ravelry.client, database: database, auth: auth);
   });
 
   tearDown(() => database.close());
@@ -95,14 +91,10 @@ void main() {
 
   test('offline, the sync stops and stored records stay', () async {
     await engine.syncEverything();
-    final offline = SyncEngine(
-      ravelry: RavelryClient(
-        baseUrl: testConfig.ravelryApiUrl,
-        auth: await signedInAuth(),
-        httpClient: MockClient((_) async => throw http.ClientException('offline')),
-      ),
+    final offline = syncEngineFor(
+      ravelryHttp: MockClient((_) async => throw http.ClientException('offline')),
       database: database,
-      clock: () => testNow,
+      auth: await signedInAuth(),
     );
 
     await expectLater(offline.syncEverything(), throwsA(isA<RavelryUnreachable>()));
