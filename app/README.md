@@ -1,6 +1,6 @@
 # Purlnote app
 
-The Flutter app. Milestone 1 covers sign-in with Ravelry, the first sync, and a read-only Notebook (projects on the needles, the queue, the stash and every other project).
+The Flutter app. So far: sign-in with Ravelry, the first sync, the Notebook (projects on the needles, the queue, the stash and every other project), and editing projects and stash offline.
 
 ## How it fits together
 
@@ -18,7 +18,9 @@ lib/
     models.dart          The fields of projects, queue items, stash yarns and the user that screens show.
   data/
     local_database.dart  The SQLite database every screen reads from.
-    sync_engine.dart     Copies the knitter's lists from Ravelry into the database.
+    sync_engine.dart     Sends waiting edits, then copies the knitter's lists from Ravelry.
+    outbox.dart          Saves edits on the phone, sends them, and holds conflicts for the knitter.
+    pending_edit.dart    One edit that hasn't reached Ravelry yet.
   screens/               Welcome, first sync, Notebook, project, stash and queue.
   widgets/               Pieces shared by several screens.
 test/                    Unit and widget tests, with a fake Ravelry in test/support.
@@ -28,6 +30,7 @@ Rules the code follows:
 
 - **Screens never wait on the network.** They show what is in the local database; the sync engine updates it.
 - **Only sign-in goes through our server.** The app sends the one-time sign-in code to the sign-in function (`auth-worker/`), which adds the client secret. Everything else goes straight from the phone to Ravelry.
+- **Edits never wait on the network either.** They show at once and are sent later. Before sending, the record is read from Ravelry again; a field changed there since the knitter started editing becomes a conflict for them to settle, so nobody's change is silently overwritten.
 - **Tokens live only in the Keychain**, never in the database or logs.
 
 ## Running it

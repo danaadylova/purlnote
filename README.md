@@ -16,8 +16,8 @@ The design (RFC and screen mockups) is kept outside the repo.
 ## Milestones
 
 0. **Spike** (done): sign-in, refresh, profile, notes-backup size, one PDF download and one project comment, checked against the real Ravelry API. Go/no-go for the rest.
-1. Sign-in and read-only notebook (in progress).
-2. Editing and sync.
+1. Sign-in and read-only notebook (built; first TestFlight build pending).
+2. Editing and sync (built): projects and stash edited offline, sent later, with field-by-field conflict choices.
 3. Pattern library and reader.
 4. Notes to project comments, then closed beta.
 5. Step-by-step instructions (after launch).
