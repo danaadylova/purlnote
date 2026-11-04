@@ -45,7 +45,7 @@ lib/
     step_builder.dart    Reads a PDF's text and makes steps (on-device model or rules).
     rule_splitter.dart   The rules: rows, rounds, headings, written-out repeats.
     size_text.dart       Picks one size's numbers out of "88 (96, 104)", "88/96/104" or "31 33 35".
-    step_models.dart     A step, and a project's place in the steps.
+    step_models.dart     One step: its text, where it came from, and the knitter's fixes.
     steps_store.dart     Steps, the knitter's fixes, and each project's place.
     steps_view.dart      One instruction at a time, with Back and Next.
   screens/               Tour, Welcome, first sync, tabs, Notebook, Library, project, stash, queue, More.
