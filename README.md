@@ -1,40 +1,64 @@
+<img src="design/app_icon_1024.png" alt="Purlnote app icon: a marigold p on plum" width="96">
+
 # Purlnote
 
-An offline-first iPhone app (Flutter, so Android can follow) that works as a phone client for a Ravelry account: projects, stash, the pattern library, and a pattern reader whose notes can go straight to a project's comments.
+A knitting and crochet notebook for iPhone. Read your pattern PDFs with notes, highlights and a row ruler that stay where you left them, follow a pattern one step at a time, and keep track of your projects. It works fully on its own, and can connect to a Ravelry account if you have one.
 
-The design (RFC and screen mockups) is kept outside the repo.
+Purlnote is in beta on TestFlight, with the App Store release coming next.
 
-## What's here
+## What it does
+
+**Patterns**
+- Import pattern PDFs from Files, or download the ones you bought on Ravelry.
+- Highlight the size you're making, write with a pen, and pin notes anywhere on a page.
+- A row ruler sits on the line you're knitting. Move it in small steps, or press and hold to drag it. It comes back on the same row next time.
+- Row counters and repeat counters for each project, and a timer that keeps the screen awake while you knit.
+
+**Step by step**
+- Turns a pattern into one instruction at a time, with Back and Next.
+- Shows only your size's numbers, whether the pattern writes them as "88 (96, 104)", "88/96/104" or "31 33 35".
+- Choose where to start, so you can skip the pattern's introduction.
+- Made on the phone: by Apple's on-device model where it's available, and by built-in rules everywhere else. Patterns are never uploaded.
+
+**Projects**
+- The Notebook shows the projects on your needles as big cards you swipe through, with finished projects underneath.
+- Notes, photos and counters for each project.
+- With Ravelry connected: your Ravelry projects, stash, queue and purchased patterns, edited offline and sent when you're back online. A note can also be posted as a comment on the project.
+
+**Getting started**
+- A short tour on first launch, with a Skip button.
+- Use it straight away on your phone, or sign in with Ravelry. You can connect Ravelry later, or never.
+
+## Privacy
+
+- Your PDFs, notes, highlights and counters stay on your phone.
+- There are no ads, no analytics and no Purlnote account.
+- With Ravelry connected, the app talks directly to Ravelry. The only exception is sign-in itself, which goes through a small sign-in function that keeps Ravelry's client secret out of the app. That function stores and logs nothing.
+- Ravelry sign-in happens in Apple's secure sign-in sheet, so Purlnote never sees your password. Sign-in tokens are kept in the iPhone Keychain.
+
+## Feedback
+
+Ideas, bugs, or just hello: **unraveled.makes@gmail.com**, or **More → Send feedback** in the app.
+
+## For developers
 
 | Folder | What it is |
 | --- | --- |
-| `app/` | The Flutter app. See `app/README.md`. |
-| `auth-worker/` | The sign-in function (Cloudflare Worker). Holds Ravelry's client secret so the app doesn't have to. Also serves the milestone 0 check page at `/spike`. |
-| `codemagic.yaml` | Builds the iPhone app in the cloud and sends it to TestFlight (setup steps at the top of the file). |
-| `.github/workflows/` | Checks the app and the function on every push, and deploys the function to Cloudflare from `main`. |
+| `app/` | The Flutter app. [`app/README.md`](app/README.md) explains how the code fits together and how to run it. |
+| `auth-worker/` | The sign-in function (a Cloudflare Worker). Ravelry only accepts its client secret from a server, so this holds it and swaps sign-in codes for tokens. |
+| `design/` | The app icon and the script that draws it. |
+| `codemagic.yaml` | Builds the iPhone app in the cloud and uploads it to TestFlight. Setup steps are at the top of the file. |
+| `.github/workflows/` | On every push: format, analyze and test the app; test the sign-in function and deploy it to Cloudflare from `main`. |
 
-## Milestones
+### Secrets
 
-All five are built and checked by the tests; they still need trying on a real iPhone through TestFlight.
+No secret lives in this repository. The Ravelry client secret, the Cloudflare API token and the App Store Connect key are stored only as GitHub repository secrets or Codemagic encrypted variables. The Ravelry client ID is public by design; it appears in every sign-in link.
 
-0. **Spike** (done, go): sign-in, refresh, profile, notes-backup size, a PDF download and a project comment, checked against the real Ravelry API. Access tokens last one hour, not the 24 the docs say.
-1. **Sign-in and Notebook**: welcome, Ravelry sign-in, first sync, projects on the needles, queue, stash.
-2. **Editing and sync**: projects and stash edited offline, sent later, with field-by-field conflict choices.
-3. **Library and reader**: purchases and imported PDFs, downloads, the reader with highlights, pen, notes, row ruler, counters and a screen-awake timer.
-4. **Notes to project comments**: a note goes to the page, the project's comments or its notes; comments post once, even after a dropped connection. Notes backup to the knitter's Ravelry app data.
-5. **Step-by-step**: the pattern one instruction at a time, made on the phone by Apple's on-device model, or by rules on other iPhones.
+### Setting up your own copy
 
-Still to do by hand: TestFlight testing, the closed beta, App Store submission, and the release check for step-by-step (ten real patterns, no wrong stitch count or row number after picking a size).
+1. **Ravelry:** create an OAuth 2.0 app with the redirect URI `purlnote://oauth-callback`.
+2. **Cloudflare:** a free account, with an API token made from the "Edit Cloudflare Workers" template.
+3. **GitHub** › Settings › Secrets and variables › Actions: add `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RAVELRY_CLIENT_ID` and `RAVELRY_CLIENT_SECRET`. The **auth-worker** workflow deploys the sign-in function once they're there.
+4. **Codemagic:** follow the steps at the top of `codemagic.yaml` to sign and upload iPhone builds.
 
-## Setting up milestone 0
-
-Secrets go only into Cloudflare and GitHub's encrypted repository secrets, never into files in this repo.
-
-1. **Cloudflare**: free account. Create an API token from the "Edit Cloudflare Workers" template and note the account ID.
-2. **Ravelry**: an OAuth 2.0 app with two redirect URIs:
-   - `purlnote://oauth-callback` (the phone app)
-   - `https://purlnote-auth.<your-subdomain>.workers.dev/spike/callback` (the check page)
-3. **GitHub** › Settings › Secrets and variables › Actions, add:
-   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RAVELRY_CLIENT_ID`, `RAVELRY_CLIENT_SECRET`.
-4. Re-run the latest **auth-worker** workflow (Actions tab). It deploys once the secrets are there.
-5. Open `https://purlnote-auth.<your-subdomain>.workers.dev/spike`, choose the optional checks, and sign in. Every row should say Pass. Delete the test comment on Ravelry afterwards.
+Purlnote is not made by or affiliated with Ravelry.
