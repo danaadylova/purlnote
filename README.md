@@ -15,12 +15,16 @@ The design (RFC and screen mockups) is kept outside the repo.
 
 ## Milestones
 
-0. **Spike** (done): sign-in, refresh, profile, notes-backup size, one PDF download and one project comment, checked against the real Ravelry API. Go/no-go for the rest.
-1. Sign-in and read-only notebook (built; first TestFlight build pending).
-2. Editing and sync (built): projects and stash edited offline, sent later, with field-by-field conflict choices.
-3. Pattern library and reader.
-4. Notes to project comments, then closed beta.
-5. Step-by-step instructions (after launch).
+All five are built and checked by the tests; they still need trying on a real iPhone through TestFlight.
+
+0. **Spike** (done, go): sign-in, refresh, profile, notes-backup size, a PDF download and a project comment, checked against the real Ravelry API. Access tokens last one hour, not the 24 the docs say.
+1. **Sign-in and Notebook**: welcome, Ravelry sign-in, first sync, projects on the needles, queue, stash.
+2. **Editing and sync**: projects and stash edited offline, sent later, with field-by-field conflict choices.
+3. **Library and reader**: purchases and imported PDFs, downloads, the reader with highlights, pen, notes, row ruler, counters and a screen-awake timer.
+4. **Notes to project comments**: a note goes to the page, the project's comments or its notes; comments post once, even after a dropped connection. Notes backup to the knitter's Ravelry app data.
+5. **Step-by-step**: the pattern one instruction at a time, made on the phone by Apple's on-device model, or by rules on other iPhones.
+
+Still to do by hand: TestFlight testing, the closed beta, App Store submission, and the release check for step-by-step (ten real patterns, no wrong stitch count or row number after picking a size).
 
 ## Setting up milestone 0
 

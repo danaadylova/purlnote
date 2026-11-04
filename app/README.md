@@ -1,6 +1,6 @@
 # Purlnote app
 
-The Flutter app. So far: sign-in with Ravelry, the first sync, the Notebook (projects on the needles, the queue, the stash and every other project), and editing projects and stash offline.
+The Flutter app: sign-in with Ravelry, the Notebook, editing projects and stash offline, the pattern library and reader, notes posted to project comments, the notes backup, and step-by-step instructions.
 
 ## How it fits together
 
@@ -21,8 +21,29 @@ lib/
     sync_engine.dart     Sends waiting edits, then copies the knitter's lists from Ravelry.
     outbox.dart          Saves edits on the phone, sends them, and holds conflicts for the knitter.
     pending_edit.dart    One edit that hasn't reached Ravelry yet.
-  screens/               Welcome, first sync, Notebook, project, stash and queue.
+  library/
+    library_models.dart  Patterns (purchases and imports), their files, and counters.
+    library_store.dart   Reads and writes the library and per-pattern settings.
+    pdf_files.dart       Downloads purchased PDFs and imports PDFs from Files.
+  reader/
+    reader_screen.dart   The reader: files, pages, tools, counters, Page | Steps.
+    page_marks.dart      Highlights, pen strokes and note pins drawn on a page.
+    reader_store.dart    Reading spots, annotations and counters.
+    counters_bar.dart    The row counter and repeat counters.
+    awake_timer.dart     Keeps the screen on while reading.
+  notes/
+    note_sheet.dart      The New note sheet and the comment-permission explainer.
+    project_comments.dart Posts notes as project comments, never twice.
+    notes_backup.dart    Backs up notes and counters to the knitter's Ravelry app data.
+  steps/
+    step_builder.dart    Reads a PDF's text and makes steps (on-device model or rules).
+    rule_splitter.dart   The rules: rows, rounds, headings, written-out repeats.
+    size_text.dart       Picks one size's numbers out of "88 (96, 104)".
+    steps_store.dart     Steps, the knitter's fixes, and each project's place.
+    steps_view.dart      One instruction at a time, with Back and Next.
+  screens/               Welcome, first sync, tabs, Notebook, Library, project, stash, queue, You.
   widgets/               Pieces shared by several screens.
+ios/Runner/AppDelegate.swift  The bridge to Apple's on-device model for step-by-step.
 test/                    Unit and widget tests, with a fake Ravelry in test/support.
 ```
 
@@ -31,7 +52,9 @@ Rules the code follows:
 - **Screens never wait on the network.** They show what is in the local database; the sync engine updates it.
 - **Only sign-in goes through our server.** The app sends the one-time sign-in code to the sign-in function (`auth-worker/`), which adds the client secret. Everything else goes straight from the phone to Ravelry.
 - **Edits never wait on the network either.** They show at once and are sent later. Before sending, the record is read from Ravelry again; a field changed there since the knitter started editing becomes a conflict for them to settle, so nobody's change is silently overwritten.
-- **Tokens live only in the Keychain**, never in the database or logs.
+- **Tokens live only in the Keychain**, never in the database or logs. PDF downloads use a separate sign-in, because Ravelry's PDF permission comes with shorter-lived tokens.
+- **PDFs never leave the phone.** Notes and highlights belong to a file's SHA-256, so they come back if the same PDF is downloaded or imported again. Step-by-step reads the PDF on the phone, never in the cloud.
+- **Comments are public and can't be edited on Ravelry**, so the app says so before posting, and checks before any retry that a comment wasn't already posted.
 
 ## Running it
 
