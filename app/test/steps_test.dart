@@ -64,6 +64,24 @@ void main() {
       expect(findSizeNames('Sizes: XS (S/M/L)'), ['XS', 'S', 'M', 'L']);
     });
 
+    test('numbers written one per size without brackets, once the size count is known', () {
+      const text = 'Cast on 31 33 35 sts using 5.5 mm [US 9] circular needles.';
+      expect(textForSize(text, 0, sizeCount: 3), 'Cast on 31 sts using 5.5 mm [US 9] circular needles.');
+      expect(textForSize(text, 2, sizeCount: 3), 'Cast on 35 sts using 5.5 mm [US 9] circular needles.');
+      expect(textForSize('K 10/12/14 sts.', 1, sizeCount: 3), 'K 12 sts.');
+      expect(textForSize('Work 2 4 6 8 rows.', 0, sizeCount: 3), 'Work 2 4 6 8 rows.', reason: 'a run of a different length is left alone');
+      expect(textForSize(text, 0), text, reason: 'without the size count, plain runs are not touched');
+      expect(hasSizeGroup(text, sizeCount: 3), isTrue);
+    });
+
+    test('size names and counts without brackets', () {
+      expect(findSizeNames('Sizes: S M L\nYarn: …'), ['S', 'M', 'L']);
+      expect(findSizeNames('SIZE 1 2 3 4 5'), ['1', '2', '3', '4', '5']);
+      const pattern = 'Sizes: S M L\nCast on 31 33 35 sts.\nWork 4 6 8 rows.\nBind off 10 12 14 sts.';
+      expect(sizeNamesFor(pattern), ['S', 'M', 'L']);
+      expect(sizeNamesFor('Cast on 31 33 35 sts.\nWork 4 6 8 rows.'), ['Size 1', 'Size 2', 'Size 3']);
+    });
+
     test('offers as many sizes as the numbers have, even if the names list is shorter', () {
       const text = 'Sizes: S (M)\nCast on 80 (88, 96, 104) sts.';
       expect(sizeNamesFor(text), ['S', 'M', 'Size 3', 'Size 4']);

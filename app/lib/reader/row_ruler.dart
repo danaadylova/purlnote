@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
 
@@ -77,67 +78,112 @@ class RulerPosition {
 
 /// The ruler drawn on one page: the band, and the rest of the page dimmed so
 /// the current row stands out. Pages other than the ruler's are dimmed
-/// whole. Movement is animated, so the eye can follow it.
-class RulerOverlay extends StatelessWidget {
-  const RulerOverlay({super.key, required this.ruler, required this.page});
+/// whole. Button moves are animated, so the eye can follow them.
+///
+/// Press and hold the band to pick it up, then drag it to another row; it
+/// follows the finger exactly and is put down where it's let go. Short
+/// touches and swipes on the band still scroll the page as usual.
+class RulerOverlay extends StatefulWidget {
+  const RulerOverlay({super.key, required this.ruler, required this.page, required this.onDragged, required this.onDropped});
 
   final RulerPosition ruler;
   final int page;
 
+  /// While dragging: the band's new top, as a fraction of the page height.
+  final ValueChanged<double> onDragged;
+
+  /// When let go, so the position can be saved.
+  final VoidCallback onDropped;
+
+  @override
+  State<RulerOverlay> createState() => _RulerOverlayState();
+}
+
+class _RulerOverlayState extends State<RulerOverlay> {
   static const _dim = Color(0x8CFFF8EE);
   static const _duration = Duration(milliseconds: 220);
 
+  bool _dragging = false;
+  double _topWhenPickedUp = 0;
+
   @override
   Widget build(BuildContext context) {
-    if (page != ruler.page) {
+    final ruler = widget.ruler;
+    if (widget.page != ruler.page) {
       return const IgnorePointer(child: ColoredBox(color: _dim, child: SizedBox.expand()));
     }
-    return IgnorePointer(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final pageHeight = constraints.maxHeight;
-          final top = ruler.top * pageHeight;
-          final band = ruler.height * pageHeight;
-          return Stack(
-            children: [
-              AnimatedPositioned(
-                duration: _duration,
-                curve: Curves.easeOut,
-                top: 0,
-                left: 0,
-                right: 0,
-                height: top,
-                child: const ColoredBox(color: _dim),
-              ),
-              AnimatedPositioned(
-                duration: _duration,
-                curve: Curves.easeOut,
-                top: top + band,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: const ColoredBox(color: _dim),
-              ),
-              AnimatedPositioned(
-                duration: _duration,
-                curve: Curves.easeOut,
-                top: top,
-                left: 0,
-                right: 0,
-                height: band,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: PurlnoteColors.marigold.withValues(alpha: 0.12),
-                    border: const Border.symmetric(
-                      horizontal: BorderSide(color: PurlnoteColors.marigoldDark, width: 2),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final pageHeight = constraints.maxHeight;
+        final top = ruler.top * pageHeight;
+        final band = ruler.height * pageHeight;
+        // While dragging, the band follows the finger with no delay.
+        final duration = _dragging ? Duration.zero : _duration;
+        return Stack(
+          children: [
+            AnimatedPositioned(
+              duration: duration,
+              curve: Curves.easeOut,
+              top: 0,
+              left: 0,
+              right: 0,
+              height: top,
+              child: const IgnorePointer(child: ColoredBox(color: _dim)),
+            ),
+            AnimatedPositioned(
+              duration: duration,
+              curve: Curves.easeOut,
+              top: top + band,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: const IgnorePointer(child: ColoredBox(color: _dim)),
+            ),
+            AnimatedPositioned(
+              duration: duration,
+              curve: Curves.easeOut,
+              // The touch area reaches a little past the band, so a thin
+              // ruler is still easy to pick up.
+              top: top - 12,
+              left: 0,
+              right: 0,
+              height: band + 24,
+              child: Semantics(
+                label: 'Row ruler. Press and hold, then drag to move it.',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onLongPressStart: (_) {
+                    HapticFeedback.mediumImpact();
+                    setState(() {
+                      _dragging = true;
+                      _topWhenPickedUp = ruler.top;
+                    });
+                  },
+                  onLongPressMoveUpdate: (details) {
+                    final moved = _topWhenPickedUp + details.offsetFromOrigin.dy / pageHeight;
+                    widget.onDragged(moved.clamp(0.0, 1 - ruler.height));
+                  },
+                  onLongPressEnd: (_) {
+                    setState(() => _dragging = false);
+                    widget.onDropped();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: PurlnoteColors.marigold.withValues(alpha: _dragging ? 0.25 : 0.12),
+                        border: Border.symmetric(
+                          horizontal: BorderSide(color: PurlnoteColors.marigoldDark, width: _dragging ? 3 : 2),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ],
-          );
-        },
-      ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

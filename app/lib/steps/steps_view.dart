@@ -173,7 +173,7 @@ class _StepsViewState extends State<StepsView> {
             for (final step in skipped)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Text(sizeIndex == null ? step.text : textForSize(step.text, sizeIndex)),
+                child: Text(sizeIndex == null ? step.text : textForSize(step.text, sizeIndex, sizeCount: _sizeNames.length)),
               ),
           ],
         ),
@@ -347,7 +347,8 @@ class _StepsViewState extends State<StepsView> {
     final basic = _all.isNotEmpty && _all.every((s) => s.madeBy != StepMaker.model);
     final sizeIndex = _progress.sizeIndex;
 
-    String shown(PatternStep s) => sizeIndex == null || _showAllSizes ? s.text : textForSize(s.text, sizeIndex);
+    String shown(PatternStep s) =>
+        sizeIndex == null || _showAllSizes ? s.text : textForSize(s.text, sizeIndex, sizeCount: _sizeNames.length);
 
     return Column(
       children: [
@@ -392,7 +393,7 @@ class _StepsViewState extends State<StepsView> {
                   step: step,
                   text: shown(step),
                   showingAllSizes: _showAllSizes || sizeIndex == null,
-                  canToggleSizes: sizeIndex != null && sizeCountIn(step.text) > 1,
+                  canToggleSizes: sizeIndex != null && hasSizeGroup(step.text, sizeCount: _sizeNames.length),
                   onToggleSizes: () => setState(() => _showAllSizes = !_showAllSizes),
                   onShowPage: () => widget.onShowPage(step.sourcePage),
                   onFix: () => _fix(step, next),

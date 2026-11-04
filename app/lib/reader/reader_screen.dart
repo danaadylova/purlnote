@@ -503,7 +503,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 scaleEnabled: !_tool.drawsOnPage,
                 onPageChanged: _pageChanged,
                 pageOverlaysBuilder: (context, pageRect, page) => [
-                  if (_ruler?.visible == true) RulerOverlay(ruler: _ruler!, page: page.pageNumber),
+                  if (_ruler?.visible == true)
+                    RulerOverlay(
+                      ruler: _ruler!,
+                      page: page.pageNumber,
+                      onDragged: (top) => setState(() => _ruler = _ruler!.copyWith(top: top)),
+                      onDropped: () => _saveRuler(_ruler!),
+                    ),
                   PageMarks(
                     page: page.pageNumber,
                     marks: _marks.where((mark) => mark.page == page.pageNumber).toList(),

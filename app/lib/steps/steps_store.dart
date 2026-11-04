@@ -102,12 +102,12 @@ class StepsStore {
   /// The sizes found in a file's text when its steps were made, or null if
   /// not worked out yet.
   Future<List<String>?> sizeNames(String fileSha256) async {
-    final saved = await database.setting('sizes:$fileSha256');
+    final saved = await database.setting('sizes_v2:$fileSha256');
     return saved == null ? null : (jsonDecode(saved) as List).cast<String>();
   }
 
   Future<void> saveSizeNames(String fileSha256, List<String> names) =>
-      database.saveSetting('sizes:$fileSha256', jsonEncode(names));
+      database.saveSetting('sizes_v2:$fileSha256', jsonEncode(names));
 
   // Where the pattern starts -------------------------------------------------
 
