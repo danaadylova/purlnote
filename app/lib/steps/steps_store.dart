@@ -33,8 +33,10 @@ class StepsStore {
     return rows.map(PatternStep.fromRow).toList();
   }
 
-  /// Replaces a file's steps (a first build or "Rebuild steps").
+  /// Replaces a file's steps (a first build or "Rebuild steps"). The chosen
+  /// start belonged to the old steps, so it's cleared.
   Future<void> replaceSteps(String fileSha256, List<PatternStep> steps) async {
+    await _db.delete('app_setting', where: 'name = ?', whereArgs: ['steps_start:$fileSha256']);
     await _db.transaction((txn) async {
       await txn.delete('pattern_step', where: 'file_sha256 = ?', whereArgs: [fileSha256]);
       final batch = txn.batch();
@@ -106,6 +108,18 @@ class StepsStore {
 
   Future<void> saveSizeNames(String fileSha256, List<String> names) =>
       database.saveSetting('sizes:$fileSha256', jsonEncode(names));
+
+  // Where the pattern starts -------------------------------------------------
+
+  /// The step the knitter chose as the start of the instructions (skipping
+  /// the materials, gauge and notes at the top), or null if not chosen.
+  Future<int?> startStepId(String fileSha256) async {
+    final saved = await database.setting('steps_start:$fileSha256');
+    return saved == null ? null : int.tryParse(saved);
+  }
+
+  Future<void> saveStartStepId(String fileSha256, int stepId) =>
+      database.saveSetting('steps_start:$fileSha256', '$stepId');
 
   // Progress -----------------------------------------------------------------
 

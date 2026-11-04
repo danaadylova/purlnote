@@ -21,7 +21,7 @@ final _brackets = RegExp(_bracket);
 final _separators = RegExp(r'[,;/]');
 
 /// The values of one size group, first size first.
-List<String> _valuesOf(RegExpMatch group) {
+List<String> _valuesOf(Match group) {
   final values = [group.group(1)!.trim()];
   for (final bracket in _brackets.allMatches(group.group(2)!)) {
     final inside = bracket.group(0)!.substring(1, bracket.group(0)!.length - 1);

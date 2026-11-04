@@ -6,6 +6,7 @@ import 'package:purlnote/steps/size_text.dart';
 import 'package:purlnote/steps/step_builder.dart';
 import 'package:purlnote/steps/step_models.dart';
 import 'package:purlnote/steps/steps_store.dart';
+import 'package:purlnote/steps/steps_view.dart';
 
 import 'support/fakes.dart';
 
@@ -192,6 +193,19 @@ void main() {
       steps = await store.stepsFor('abc');
       expect(steps.last.hidden, isTrue);
       expect(steps.first.text, 'Knit all sts.');
+    });
+
+    test('the chosen start is kept per file, and cleared when steps are rebuilt', () async {
+      await store.replaceSteps('abc', const RuleSplitter().split([samplePattern]));
+      final steps = await store.stepsFor('abc');
+      final suggested = suggestedStart(steps)!;
+      expect(suggested.text, startsWith('Cast on'), reason: 'materials and sizes come before');
+
+      await store.saveStartStepId('abc', suggested.id!);
+      expect(await store.startStepId('abc'), suggested.id);
+
+      await store.replaceSteps('abc', steps);
+      expect(await store.startStepId('abc'), isNull);
     });
 
     test('each project keeps its own place and size', () async {

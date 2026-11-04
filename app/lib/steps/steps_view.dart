@@ -52,7 +52,23 @@ class _StepsViewState extends State<StepsView> {
   String? _building;
   List<int> _pagesWithoutText = const [];
 
-  List<PatternStep> get _visible => _all.where((step) => !step.hidden).toList();
+  /// The step the instructions start at, chosen by the knitter. Steps before
+  /// it (materials, gauge, notes) are skipped.
+  int? _startId;
+
+  /// The steps to follow: from the chosen start on, without hidden ones.
+  List<PatternStep> get _visible {
+    final shown = _all.where((step) => !step.hidden).toList();
+    final start = shown.indexWhere((step) => step.id == _startId);
+    return start <= 0 ? shown : shown.sublist(start);
+  }
+
+  /// Steps before the chosen start, for "Pattern info" at the top.
+  List<PatternStep> get _skipped {
+    final shown = _all.where((step) => !step.hidden).toList();
+    final start = shown.indexWhere((step) => step.id == _startId);
+    return start <= 0 ? const [] : shown.sublist(0, start);
+  }
 
   @override
   void initState() {
@@ -76,14 +92,93 @@ class _StepsViewState extends State<StepsView> {
     }
     final progress = await _store.progress(widget.projectId, widget.fileSha256);
     final sizes = await widget.session.stepBuilder.sizeNames(fileSha256: widget.fileSha256, pdfPath: widget.pdfPath);
+    final startId = await _store.startStepId(widget.fileSha256);
     if (!mounted) return;
     setState(() {
       _all = steps;
       _progress = progress;
       _sizeNames = sizes;
+      _startId = startId;
       _building = null;
     });
+    // First time with this pattern: ask the size, then where to start.
     if (progress.sizeIndex == null && _sizeNames.isNotEmpty) await _pickSize();
+    if (startId == null && mounted && _all.length > 3) await _chooseStart(firstTime: true);
+  }
+
+  /// Lets the knitter pick where the instructions begin. The steps before it
+  /// stay readable under "Pattern info" but Back and Next skip them.
+  ///
+  /// The first time, closing the list without choosing starts at the very
+  /// first step, so the question isn't asked on every open; the menu's
+  /// "Choose where the pattern starts" changes it any time.
+  Future<void> _chooseStart({bool firstTime = false}) async {
+    final shown = _all.where((step) => !step.hidden).toList();
+    final chosen = await showModalBottomSheet<PatternStep>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _StepPicker(
+        title: 'Where do you start?',
+        explanation: 'Patterns usually begin with materials, gauge and notes. Tap the first instruction you\'ll work, '
+            'such as the cast on. Everything before it stays under Pattern info.',
+        steps: shown,
+        highlighted: shown.where((step) => step.id == _startId).firstOrNull ?? suggestedStart(shown),
+        highlightLabel: _startId == null ? 'Suggested' : 'Current start',
+      ),
+    );
+    final start = chosen ?? (firstTime && shown.isNotEmpty ? shown.first : null);
+    if (start?.id == null) return;
+    await _store.saveStartStepId(widget.fileSha256, start!.id!);
+    setState(() => _startId = start.id);
+    await _save(StepProgress(currentStep: 0, sizeIndex: _progress.sizeIndex, nextMovesCounter: _progress.nextMovesCounter));
+  }
+
+  /// Jumps to any step, listed by section.
+  Future<void> _jumpTo() async {
+    final visible = _visible;
+    final index = _progress.currentStep.clamp(0, visible.length - 1);
+    final chosen = await showModalBottomSheet<PatternStep>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _StepPicker(
+        title: 'Go to a step',
+        steps: visible,
+        highlighted: visible[index],
+        highlightLabel: 'You are here',
+      ),
+    );
+    if (chosen == null) return;
+    await _save(StepProgress(
+      currentStep: visible.indexOf(chosen),
+      sizeIndex: _progress.sizeIndex,
+      nextMovesCounter: _progress.nextMovesCounter,
+    ));
+  }
+
+  void _showPatternInfo() {
+    final skipped = _skipped;
+    final sizeIndex = _progress.sizeIndex;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        builder: (context, scroll) => ListView(
+          controller: scroll,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Semantics(header: true, child: Text('Pattern info', style: Theme.of(context).textTheme.titleLarge)),
+            const SizedBox(height: 8),
+            for (final step in skipped)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(sizeIndex == null ? step.text : textForSize(step.text, sizeIndex)),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _save(StepProgress progress) async {
@@ -269,6 +364,8 @@ class _StepsViewState extends State<StepsView> {
             nextMovesCounter: !_progress.nextMovesCounter,
           )),
           onRebuild: _confirmRebuild,
+          onJump: _jumpTo,
+          onChooseStart: () => _chooseStart(),
         ),
         if (basic) const _Notice(text: 'Basic steps on this iPhone. Some may be split oddly; press and hold a step to fix it.'),
         if (_pagesWithoutText.isNotEmpty)
@@ -277,6 +374,15 @@ class _StepsViewState extends State<StepsView> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             children: [
+              if (index == 0 && _skipped.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _showPatternInfo,
+                    icon: const Icon(Icons.info_outline),
+                    label: Text('Pattern info (${_skipped.length} parts before the start)'),
+                  ),
+                ),
               if (previous != null)
                 _SideStep(heading: previous.heading, text: shown(previous), dashed: false),
               const SizedBox(height: 10),
@@ -338,6 +444,8 @@ class _StepsHeader extends StatelessWidget {
     required this.onPickSize,
     required this.onToggleCounter,
     required this.onRebuild,
+    required this.onJump,
+    required this.onChooseStart,
   });
 
   final String? section;
@@ -348,6 +456,8 @@ class _StepsHeader extends StatelessWidget {
   final VoidCallback onPickSize;
   final VoidCallback onToggleCounter;
   final VoidCallback onRebuild;
+  final VoidCallback onJump;
+  final VoidCallback onChooseStart;
 
   @override
   Widget build(BuildContext context) {
@@ -356,12 +466,22 @@ class _StepsHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(section ?? 'Pattern', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                Text(position, style: const TextStyle(fontSize: 13, color: PurlnoteColors.plumMuted)),
-              ],
+            child: InkWell(
+              onTap: onJump,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(section ?? 'Pattern', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    Text(
+                      '$position · Go to…',
+                      style: const TextStyle(fontSize: 13, color: PurlnoteColors.plumMuted),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           if (hasSizes)
@@ -378,9 +498,13 @@ class _StepsHeader extends StatelessWidget {
             onSelected: (choice) {
               if (choice == 'counter') onToggleCounter();
               if (choice == 'rebuild') onRebuild();
+              if (choice == 'jump') onJump();
+              if (choice == 'start') onChooseStart();
               if (choice == 'size') onPickSize();
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'jump', child: Text('Go to a step')),
+              const PopupMenuItem(value: 'start', child: Text('Choose where the pattern starts')),
               if (hasSizes) const PopupMenuItem(value: 'size', child: Text('Change size')),
               CheckedPopupMenuItem(value: 'counter', checked: nextMovesCounter, child: const Text('Next moves the row counter')),
               const PopupMenuItem(value: 'rebuild', child: Text('Rebuild steps')),
@@ -565,6 +689,97 @@ class _SizePicker extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The first step that looks like real instructions: a row or round, or a
+/// cast on. Used to suggest where the pattern starts.
+PatternStep? suggestedStart(List<PatternStep> steps) {
+  final castOn = RegExp(r'\b(cast on|co\b|ch(ain)? \d+|make a slip knot|set-?up)', caseSensitive: false);
+  for (final step in steps) {
+    if (step.isRow || castOn.hasMatch(step.text)) return step;
+  }
+  return steps.isEmpty ? null : steps.first;
+}
+
+/// A list of steps grouped by section, for choosing the start or jumping to
+/// a step. Returns the step tapped.
+class _StepPicker extends StatelessWidget {
+  const _StepPicker({
+    required this.title,
+    required this.steps,
+    this.explanation,
+    this.highlighted,
+    this.highlightLabel,
+  });
+
+  final String title;
+  final String? explanation;
+  final List<PatternStep> steps;
+  final PatternStep? highlighted;
+  final String? highlightLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlightIndex = highlighted == null ? 0 : steps.indexOf(highlighted!);
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.85,
+      builder: (context, scroll) {
+        final rows = <Widget>[];
+        String? section;
+        for (var i = 0; i < steps.length; i++) {
+          final step = steps[i];
+          if (step.section != section) {
+            section = step.section;
+            if (section != null) {
+              rows.add(Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: Semantics(
+                  header: true,
+                  child: Text(section, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                ),
+              ));
+            }
+          }
+          final isHighlighted = i == highlightIndex;
+          rows.add(ListTile(
+            selected: isHighlighted,
+            selectedTileColor: PurlnoteColors.mossLight,
+            selectedColor: PurlnoteColors.plum,
+            title: Text(step.heading, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(step.text, maxLines: 2, overflow: TextOverflow.ellipsis),
+            trailing: isHighlighted && highlightLabel != null
+                ? Text(highlightLabel!, style: const TextStyle(fontWeight: FontWeight.w700, color: PurlnoteColors.mossDark))
+                : Text('p.${step.sourcePage}', style: const TextStyle(color: PurlnoteColors.plumMuted)),
+            onTap: () => Navigator.pop(context, step),
+          ));
+        }
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(header: true, child: Text(title, style: Theme.of(context).textTheme.titleLarge)),
+                  if (explanation != null) ...[
+                    const SizedBox(height: 6),
+                    Text(explanation!, style: const TextStyle(height: 1.4)),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                controller: scroll,
+                children: rows,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

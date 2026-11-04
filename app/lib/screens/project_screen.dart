@@ -620,21 +620,21 @@ class _NotesSection extends StatelessWidget {
   }
 
   Future<void> _add(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
     final text = await _askForText(context, title: 'New note');
-    if (text == null || text.trim().isEmpty || !context.mounted) return;
-    _report(context, await session.addProjectNote(project.id, text));
+    if (text == null || text.trim().isEmpty) return;
+    _report(messenger, await session.addProjectNote(project.id, text));
   }
 
   Future<void> _edit(BuildContext context, int index, String entry) async {
+    final messenger = ScaffoldMessenger.of(context);
     final text = await _askForText(context, title: 'Note', initial: entry, canDelete: true);
-    if (text == null || !context.mounted) return;
-    _report(context, await session.editProjectNote(project.id, index, text.isEmpty ? null : text));
+    if (text == null) return;
+    _report(messenger, await session.editProjectNote(project.id, index, text.isEmpty ? null : text));
   }
 
-  void _report(BuildContext context, String? problem) {
-    if (problem != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
-    }
+  void _report(ScaffoldMessengerState messenger, String? problem) {
+    if (problem != null) messenger.showSnackBar(SnackBar(content: Text(problem)));
   }
 
   @override
