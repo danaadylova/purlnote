@@ -81,10 +81,11 @@ class NotebookScreen extends StatelessWidget {
   /// The project or yarn a pending edit belongs to, by name.
   String _recordName(PendingEdit edit) {
     return switch (edit.recordType) {
-      RecordType.project => session.projectById(edit.ravelryId)?.name,
-      RecordType.stash => session.stashById(edit.ravelryId)?.name,
-      _ => null,
-    } ?? 'An item';
+          RecordType.project => session.projectById(edit.ravelryId)?.name,
+          RecordType.stash => session.stashById(edit.ravelryId)?.name,
+          _ => null,
+        } ??
+        'An item';
   }
 
   void _openProject(BuildContext context, Project project) {

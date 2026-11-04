@@ -172,8 +172,7 @@ class AppSession extends ChangeNotifier {
   }
 
   /// Edits that need the knitter to choose between their version and Ravelry's.
-  List<PendingEdit> get conflicts =>
-      pendingEdits.where((edit) => edit.state == PendingEditState.conflict).toList();
+  List<PendingEdit> get conflicts => pendingEdits.where((edit) => edit.state == PendingEditState.conflict).toList();
 
   /// Edits Ravelry refused for good.
   List<PendingEdit> get failedEdits => pendingEdits.where((edit) => edit.state == PendingEditState.failed).toList();

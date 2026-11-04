@@ -134,7 +134,10 @@ class LocalDatabase {
     if (current == null) return;
     await _db.update(
       'ravelry_record',
-      {'body': jsonEncode({...current, ...fields}), 'fetched_at': now.millisecondsSinceEpoch},
+      {
+        'body': jsonEncode({...current, ...fields}),
+        'fetched_at': now.millisecondsSinceEpoch
+      },
       where: 'type = ? AND ravelry_id = ?',
       whereArgs: [type.name, ravelryId],
     );

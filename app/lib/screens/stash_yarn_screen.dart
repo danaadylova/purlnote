@@ -112,7 +112,9 @@ class _StashYarnScreenState extends State<StashYarnScreen> {
           DropdownButtonFormField<StashStatus>(
             initialValue: _status,
             decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
-            items: [for (final status in StashStatus.values) DropdownMenuItem(value: status, child: Text(status.label))],
+            items: [
+              for (final status in StashStatus.values) DropdownMenuItem(value: status, child: Text(status.label))
+            ],
             onChanged: (status) => setState(() => _status = status ?? _status),
           ),
           const SizedBox(height: 16),
@@ -135,7 +137,8 @@ class _StashYarnScreenState extends State<StashYarnScreen> {
             minLines: 3,
             maxLines: 10,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Notes', alignLabelWithHint: true, border: OutlineInputBorder()),
+            decoration:
+                const InputDecoration(labelText: 'Notes', alignLabelWithHint: true, border: OutlineInputBorder()),
           ),
           const SizedBox(height: 24),
           const Text(
