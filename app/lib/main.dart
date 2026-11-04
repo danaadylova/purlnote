@@ -16,6 +16,7 @@ import 'notes/project_comments.dart';
 import 'ravelry/ravelry_client.dart';
 import 'screens/first_sync_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/tutorial_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'theme.dart';
 
@@ -77,6 +78,7 @@ class PurlnoteApp extends StatelessWidget {
         listenable: session,
         builder: (context, _) => switch (session.stage) {
           AppStage.starting => const _Launching(),
+          AppStage.tutorial => TutorialScreen(onDone: session.finishTutorial),
           AppStage.signedOut => WelcomeScreen(session: session),
           AppStage.firstSync => FirstSyncScreen(session: session),
           AppStage.ready => HomeScreen(session: session),

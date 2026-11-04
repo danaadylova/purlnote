@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_session.dart';
 import '../theme.dart';
+import 'tutorial_screen.dart';
 
 /// The knitter's account: who is signed in, the Ravelry connection, and
 /// signing out.
@@ -74,6 +75,19 @@ class YouScreen extends StatelessWidget {
                   onTap: () => _connect(context),
                 ),
               ],
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.lightbulb_outline),
+                title: const Text('How Purlnote works'),
+                subtitle: const Text('A short tour of patterns, notes, the row ruler and Steps.'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    fullscreenDialog: true,
+                    builder: (tour) => TutorialScreen(doneLabel: 'Done', onDone: () => Navigator.of(tour).pop()),
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Purlnote is not made by or affiliated with Ravelry. PDFs and your notes on them stay on this phone.',

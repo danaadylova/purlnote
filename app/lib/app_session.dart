@@ -29,6 +29,9 @@ enum AppStage {
   /// Reading the database at launch.
   starting,
 
+  /// The very first launch: a short tour of the app, which can be skipped.
+  tutorial,
+
   /// No Ravelry account on this phone yet: show Welcome.
   signedOut,
 
@@ -72,6 +75,7 @@ class AppSession extends ChangeNotifier {
   bool connected = false;
 
   static const _withoutRavelrySetting = 'use_without_ravelry';
+  static const _tutorialSeenSetting = 'tutorial_seen';
 
   /// Step-by-step instructions made from each PDF.
   final StepsStore steps;
@@ -131,8 +135,10 @@ class AppSession extends ChangeNotifier {
       if (await database.setting(_withoutRavelrySetting) == 'true') {
         await _loadFromDatabase();
         _moveTo(AppStage.ready);
-      } else {
+      } else if (await database.setting(_tutorialSeenSetting) == 'true') {
         _moveTo(AppStage.signedOut);
+      } else {
+        _moveTo(AppStage.tutorial);
       }
       return;
     }
@@ -145,6 +151,14 @@ class AppSession extends ChangeNotifier {
       _moveTo(AppStage.ready);
       await refresh();
     }
+  }
+
+  /// Ends the first-launch tour, finished or skipped, and goes on to
+  /// Welcome. The tour isn't shown at launch again; it stays available from
+  /// You.
+  Future<void> finishTutorial() async {
+    await database.saveSetting(_tutorialSeenSetting, 'true');
+    _moveTo(AppStage.signedOut);
   }
 
   /// Starts using Purlnote with everything kept on this phone. A Ravelry

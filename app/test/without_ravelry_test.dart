@@ -40,9 +40,11 @@ void main() {
   }
 
   group('using Purlnote without Ravelry', () {
-    test('the first launch asks; after "start on this phone" it opens straight to the app', () async {
+    test('first launch: the tour, then Welcome; after "start on this phone" it opens straight to the app', () async {
       final session = phoneOnlySession();
       await session.start();
+      expect(session.stage, AppStage.tutorial);
+      await session.finishTutorial();
       expect(session.stage, AppStage.signedOut);
 
       await session.startWithoutRavelry();
