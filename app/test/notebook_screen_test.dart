@@ -61,6 +61,9 @@ void main() {
       session = await syncedSession(FakeRavelry(), database);
     });
     session.signInProblem = 'Your Ravelry sign-in ended. Please sign in again.';
+    // A phone-sized screen tall enough to show the whole welcome screen.
+    await tester.binding.setSurfaceSize(const Size(430, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(inApp(WelcomeScreen(session: session)));
 

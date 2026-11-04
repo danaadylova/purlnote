@@ -85,6 +85,8 @@ void main() {
     testWidgets('the welcome screen offers starting on the phone first', (tester) async {
       late AppSession session;
       await tester.runAsync(() async => session = phoneOnlySession());
+      await tester.binding.setSurfaceSize(const Size(430, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(MaterialApp(theme: buildPurlnoteTheme(), home: WelcomeScreen(session: session)));
 
       final start = tester.getTopLeft(find.text('Start on this phone'));
