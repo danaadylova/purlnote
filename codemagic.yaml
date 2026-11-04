@@ -34,9 +34,8 @@ workflows:
         - ravelry
       vars:
         BUNDLE_ID: com.danaadylova.purlnote
-    triggers:
-      # Only build when asked, so the free build minutes last.
-      events: []
+    # No automatic triggers: builds run only when started in Codemagic, so
+    # the free build minutes last.
     scripts:
       - name: Get packages
         script: flutter pub get
