@@ -1,0 +1,13 @@
+{
+  "name": "purlnote-app-store-screenshots",
+  "private": true,
+  "description": "Frames iPhone screenshots with captions for the App Store.",
+  "scripts": {
+    "frame": "node frame.js screenshots out"
+  },
+  "dependencies": {
+    "@fontsource/bricolage-grotesque": "^5.2.8",
+    "@fontsource/figtree": "^5.2.10",
+    "playwright": "^1.49.0"
+  }
+}
