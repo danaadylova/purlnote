@@ -179,9 +179,9 @@ class _Panel extends StatelessWidget {
 
 /// A pattern page: a white sheet with grey lines for text.
 class _Sheet extends StatelessWidget {
-  const _Sheet({this.lines = 9, this.children = const []});
+  const _Sheet({this.children = const []});
 
-  final int lines;
+  static const _lines = 9;
 
   /// Drawn on top of the lines, such as a highlight or a ruler.
   final List<Widget> children;
@@ -203,7 +203,7 @@ class _Sheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                for (var i = 0; i < lines; i++)
+                for (var i = 0; i < _lines; i++)
                   FractionallySizedBox(
                     widthFactor: i.isEven ? 0.92 : 0.7,
                     child: Container(
