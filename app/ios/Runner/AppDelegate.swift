@@ -93,7 +93,7 @@ final class StepReader {
     You split knitting and crochet pattern text into steps a knitter follows one at a time.
     Each row or round is its own step. Each separate written instruction is its own step.
     Copy the pattern's words and numbers exactly. Never change, add up or leave out a number.
-    Keep size numbers in parentheses exactly as written, for example "88 (96, 104)".
+    Keep every size number exactly as written, with all its brackets, for example "88 (96, 104) [112, 120]". Never shorten a size list.
     Keep "repeat" instructions as their own step, worded as in the pattern.
     Leave out page headers, footers, copyright lines, abbreviation lists and photo captions.
     """

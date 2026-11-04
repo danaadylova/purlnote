@@ -75,23 +75,15 @@ class _StepsViewState extends State<StepsView> {
       steps = await _store.stepsFor(widget.fileSha256);
     }
     final progress = await _store.progress(widget.projectId, widget.fileSha256);
+    final sizes = await widget.session.stepBuilder.sizeNames(fileSha256: widget.fileSha256, pdfPath: widget.pdfPath);
     if (!mounted) return;
     setState(() {
       _all = steps;
       _progress = progress;
-      _sizeNames = _sizesIn(steps);
+      _sizeNames = sizes;
       _building = null;
     });
     if (progress.sizeIndex == null && _sizeNames.isNotEmpty) await _pickSize();
-  }
-
-  /// The pattern's sizes, by name if it lists them, else "Size 1", "Size 2"…
-  static List<String> _sizesIn(List<PatternStep> steps) {
-    final text = steps.map((step) => step.text).join('\n');
-    final names = findSizeNames(text);
-    if (names.isNotEmpty) return names;
-    final count = sizeCountIn(text);
-    return count < 2 ? const [] : [for (var i = 1; i <= count; i++) 'Size $i'];
   }
 
   Future<void> _save(StepProgress progress) async {

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 
 import '../data/local_database.dart';
@@ -92,6 +94,18 @@ class StepsStore {
       'side': null,
     });
   }
+
+  // Sizes --------------------------------------------------------------------
+
+  /// The sizes found in a file's text when its steps were made, or null if
+  /// not worked out yet.
+  Future<List<String>?> sizeNames(String fileSha256) async {
+    final saved = await database.setting('sizes:$fileSha256');
+    return saved == null ? null : (jsonDecode(saved) as List).cast<String>();
+  }
+
+  Future<void> saveSizeNames(String fileSha256, List<String> names) =>
+      database.saveSetting('sizes:$fileSha256', jsonEncode(names));
 
   // Progress -----------------------------------------------------------------
 

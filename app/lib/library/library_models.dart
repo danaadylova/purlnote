@@ -1,6 +1,8 @@
 /// The pattern library: Ravelry purchases and imported PDFs, side by side.
 library;
 
+import '../app_paths.dart';
+
 /// Where a pattern came from.
 enum PatternSource { ravelry, imported }
 
@@ -69,7 +71,7 @@ class PatternFile {
       label: row['label'] as String,
       sortOrder: row['sort_order'] as int,
       attachmentId: row['attachment_id'] as int?,
-      localPath: row['local_path'] as String?,
+      localPath: row['local_path'] == null ? null : AppPaths.resolve(row['local_path'] as String),
       sha256: row['sha256'] as String?,
       bytes: row['bytes'] as int?,
     );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
+import 'app_paths.dart';
 import 'app_session.dart';
 import 'auth/auth_service.dart';
 import 'auth/tokens.dart';
@@ -19,6 +21,7 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppPaths.supportFolder = (await getApplicationSupportDirectory()).path;
 
   // Wire the pieces together once, at launch.
   final config = AppConfig.fromEnvironment();

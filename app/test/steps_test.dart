@@ -47,6 +47,27 @@ void main() {
     test('row sides in parentheses aren\'t mistaken for sizes', () {
       expect(sizeCountIn('Row 4 (RS): K1.'), 0);
     });
+
+    test('reads every common way of writing sizes', () {
+      expect(textForSize('Cast on 88 (96) (104) (112) sts.', 3), 'Cast on 112 sts.');
+      expect(textForSize('Cast on 88 (96, 104) [112, 120] sts.', 4), 'Cast on 120 sts.');
+      expect(textForSize('Knit 32 (36/40/44) rows.', 2), 'Knit 40 rows.');
+      expect(textForSize('Work 4½ (5, 5½) in.', 2), 'Work 5½ in.');
+      expect(sizeCountIn('Cast on 88 (96, 104) [112, 120] sts.'), 5);
+    });
+
+    test('finds all size names, even when the list wraps or uses several brackets', () {
+      expect(findSizeNames('Sizes: XS (S, M,\nL, XL, 2XL)'), ['XS', 'S', 'M', 'L', 'XL', '2XL']);
+      expect(findSizeNames('Size: S (M) (L) (XL)'), ['S', 'M', 'L', 'XL']);
+      expect(findSizeNames('SIZES 1 (2, 3) [4, 5]'), ['1', '2', '3', '4', '5']);
+      expect(findSizeNames('Sizes: XS (S/M/L)'), ['XS', 'S', 'M', 'L']);
+    });
+
+    test('offers as many sizes as the numbers have, even if the names list is shorter', () {
+      const text = 'Sizes: S (M)\nCast on 80 (88, 96, 104) sts.';
+      expect(sizeNamesFor(text), ['S', 'M', 'Size 3', 'Size 4']);
+      expect(sizeNamesFor('Cast on 80 sts.'), isEmpty);
+    });
   });
 
   group('splitting with rules', () {

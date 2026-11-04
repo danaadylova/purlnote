@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../app_session.dart';
 import '../data/local_database.dart';
@@ -8,6 +11,7 @@ import '../widgets/edit_widgets.dart';
 import '../widgets/project_widgets.dart';
 import '../library/library_models.dart';
 import '../notes/project_comments.dart';
+import '../projects/project_notes.dart';
 import '../reader/reader_screen.dart';
 import 'edit_conflict_screen.dart';
 import 'project_edit_screen.dart';
@@ -86,7 +90,7 @@ class _ProjectDetails extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
-          ProjectPhoto(url: project.photoUrl, size: 120),
+          _PhotoStrip(session: session, project: project),
           const SizedBox(height: 16),
           Semantics(header: true, child: Text(project.name, style: text.headlineMedium)),
           if (status != null || project.isOnPhoneOnly) ...[
@@ -111,12 +115,8 @@ class _ProjectDetails extends StatelessWidget {
           _Detail(label: 'Size', value: project.size),
           _Detail(label: 'Started', value: _formatDate(context, project.started)),
           _Detail(label: 'Finished', value: _formatDate(context, project.completed)),
-          if (project.notes != null) ...[
-            const SizedBox(height: 16),
-            Semantics(header: true, child: Text('Notes', style: text.titleMedium)),
-            const SizedBox(height: 6),
-            Text(project.notes!, style: const TextStyle(fontSize: 16, height: 1.45)),
-          ],
+          const SizedBox(height: 16),
+          _NotesSection(session: session, project: project),
           const SizedBox(height: 24),
           if (session.canCommentOn(project.id)) _CommentsSection(session: session, project: project),
           if (project.isOnPhoneOnly) _PhoneOnlyActions(session: session, project: project),
@@ -433,6 +433,254 @@ class _PhoneOnlyActions extends StatelessWidget {
           icon: const Icon(Icons.delete_outline),
           label: const Text('Delete project'),
         ),
+      ],
+    );
+  }
+}
+
+/// The project's photos in a row, with a tile to add one. Tap a photo to see
+/// it large and delete it.
+class _PhotoStrip extends StatelessWidget {
+  const _PhotoStrip({required this.session, required this.project});
+
+  final AppSession session;
+  final Project project;
+
+  static const size = 112.0;
+
+  Future<void> _add(BuildContext context) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from Photos'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    // Ravelry keeps photos at up to 1600 px, so larger ones are scaled first.
+    final picked = await ImagePicker().pickImage(source: source, maxWidth: 2000, maxHeight: 2000, imageQuality: 88);
+    if (picked == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (!project.isOnPhoneOnly) messenger.showSnackBar(const SnackBar(content: Text('Adding the photo to Ravelry…')));
+    final problem = await session.addProjectPhoto(project.id, await picked.readAsBytes(), picked.name);
+    messenger.hideCurrentSnackBar();
+    if (problem != null) messenger.showSnackBar(SnackBar(content: Text(problem)));
+  }
+
+  Future<void> _open(BuildContext context, ProjectPicture picture) async {
+    final delete = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (context) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          actions: [
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete'),
+            ),
+          ],
+        ),
+        body: Center(child: InteractiveViewer(child: _image(picture, large: true))),
+      ),
+    ));
+    if (delete != true || !context.mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this photo?'),
+        content: Text(project.isOnPhoneOnly ? 'It\'s removed from this phone.' : 'It\'s removed from the project on Ravelry.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final problem = await session.deleteProjectPhoto(project.id, picture);
+    if (problem != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+    }
+  }
+
+  static Widget _image(ProjectPicture picture, {bool large = false}) {
+    const missing = ColoredBox(color: PurlnoteColors.sand, child: Center(child: Icon(Icons.image_not_supported_outlined)));
+    final path = picture.localPath;
+    if (path != null) {
+      return Image.file(File(path), fit: large ? BoxFit.contain : BoxFit.cover, errorBuilder: (context, error, stack) => missing);
+    }
+    final url = large ? picture.url : (picture.thumbnailUrl ?? picture.url);
+    if (url == null) return missing;
+    return Image.network(url, fit: large ? BoxFit.contain : BoxFit.cover, errorBuilder: (context, error, stack) => missing);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pictures = project.pictures;
+    return SizedBox(
+      height: size,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (var i = 0; i < pictures.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Semantics(
+                button: true,
+                label: 'Photo ${i + 1} of ${pictures.length}. Open or delete.',
+                excludeSemantics: true,
+                child: GestureDetector(
+                  onTap: () => _open(context, pictures[i]),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox.square(dimension: size, child: _image(pictures[i])),
+                  ),
+                ),
+              ),
+            ),
+          Semantics(
+            button: true,
+            label: 'Add a photo',
+            excludeSemantics: true,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _add(context),
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: PurlnoteColors.inputBorder),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_a_photo_outlined, color: PurlnoteColors.moss),
+                    SizedBox(height: 4),
+                    Text('Add photo', style: TextStyle(color: PurlnoteColors.moss, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The project's notes, one entry at a time, with Add note. Tap a note to
+/// change or delete it.
+class _NotesSection extends StatelessWidget {
+  const _NotesSection({required this.session, required this.project});
+
+  final AppSession session;
+  final Project project;
+
+  Future<String?> _askForText(BuildContext context, {required String title, String? initial, bool canDelete = false}) {
+    final text = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: text,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 10,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            hintText: 'Tried on after the yoke; body length +2 cm',
+            helperText: project.isOnPhoneOnly ? null : 'Project notes are public on Ravelry.',
+          ),
+        ),
+        actions: [
+          if (canDelete) TextButton(onPressed: () => Navigator.pop(context, ''), child: const Text('Delete')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, text.text), child: const Text('Save')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _add(BuildContext context) async {
+    final text = await _askForText(context, title: 'New note');
+    if (text == null || text.trim().isEmpty || !context.mounted) return;
+    _report(context, await session.addProjectNote(project.id, text));
+  }
+
+  Future<void> _edit(BuildContext context, int index, String entry) async {
+    final text = await _askForText(context, title: 'Note', initial: entry, canDelete: true);
+    if (text == null || !context.mounted) return;
+    _report(context, await session.editProjectNote(project.id, index, text.isEmpty ? null : text));
+  }
+
+  void _report(BuildContext context, String? problem) {
+    if (problem != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = noteEntries(project.notes);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text('Notes · ${entries.length}', style: Theme.of(context).textTheme.titleMedium),
+              ),
+            ),
+            TextButton.icon(onPressed: () => _add(context), icon: const Icon(Icons.add), label: const Text('Add note')),
+          ],
+        ),
+        if (entries.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Text('No notes yet.', style: TextStyle(color: PurlnoteColors.plumMuted)),
+          ),
+        for (var i = 0; i < entries.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Material(
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: PurlnoteColors.line),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _edit(context, i, entries[i]),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(entries[i], style: const TextStyle(fontSize: 15, height: 1.4)),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

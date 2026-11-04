@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import 'rule_splitter.dart';
+import 'size_text.dart';
 import 'step_models.dart';
 import 'steps_store.dart';
 
@@ -91,6 +92,9 @@ class StepBuilder {
     void Function(int page, int pageCount)? onPage,
   }) async {
     final pages = await _readText(pdfPath);
+    // Sizes come from the PDF's own text, not the steps, so every size the
+    // pattern lists is offered even if a step was shortened.
+    await store.saveSizeNames(fileSha256, sizeNamesFor(pages.join('\n')));
     final withoutText = [
       for (var i = 0; i < pages.length; i++)
         if (pages[i].trim().isEmpty) i + 1,
@@ -127,6 +131,15 @@ class StepBuilder {
     final steps = RuleSplitter.expandRepeats(all);
     await store.replaceSteps(fileSha256, steps);
     return BuildResult(madeBy: StepMaker.model, stepCount: steps.length, pagesWithoutText: withoutText);
+  }
+
+  /// The sizes a file offers, worked out from its text once and then kept.
+  Future<List<String>> sizeNames({required String fileSha256, required String pdfPath}) async {
+    final saved = await store.sizeNames(fileSha256);
+    if (saved != null) return saved;
+    final names = sizeNamesFor((await _readText(pdfPath)).join('\n'));
+    await store.saveSizeNames(fileSha256, names);
+    return names;
   }
 
   static PatternStep _onPage(PatternStep step, int page) => PatternStep(

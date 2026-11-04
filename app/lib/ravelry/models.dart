@@ -4,6 +4,8 @@
 /// the local database, so adding a field later needs no new sync.
 library;
 
+import '../app_paths.dart';
+
 /// The signed-in knitter.
 class RavelryUser {
   const RavelryUser({required this.id, required this.username, this.firstName, this.photoUrl});
@@ -44,6 +46,8 @@ class Project {
     this.size,
     this.notes,
     this.patternId,
+    this.notesLoaded = false,
+    this.pictures = const [],
   });
 
   factory Project.fromJson(Map<String, dynamic> json) {
@@ -64,6 +68,10 @@ class Project {
       size: _text(json['size']),
       notes: _text(json['notes']),
       patternId: (json['pattern_id'] as num?)?.toInt(),
+      // Ravelry's project list leaves notes out; the project's own page and
+      // projects kept on the phone have them (even when empty).
+      notesLoaded: json.containsKey('notes') || (json['id'] as int) < 0,
+      pictures: ProjectPicture.listFrom(json),
     );
   }
 
@@ -95,10 +103,49 @@ class Project {
   /// The Ravelry pattern being knitted, if it's in Ravelry's catalogue.
   final int? patternId;
 
+  /// Whether [notes] is the real notes field, not just missing because only
+  /// the project list has been loaded. Notes are only changed when it is.
+  final bool notesLoaded;
+
+  /// Every photo, first one first. Ravelry's list has only the first photo;
+  /// the project's own page has them all.
+  final List<ProjectPicture> pictures;
+
   bool get isOnTheNeedles => statusName == 'In progress';
 
   /// Kept on this phone only, not on Ravelry (see LocalProjects).
   bool get isOnPhoneOnly => id < 0;
+}
+
+/// One photo of a project: on Ravelry (with its ID and address) or, for a
+/// project kept on the phone, a file on the phone.
+class ProjectPicture {
+  const ProjectPicture({this.ravelryId, this.url, this.thumbnailUrl, this.localPath});
+
+  /// Ravelry's photos (all of them from the project's own page, or only the
+  /// first from the project list), then any photos kept on the phone.
+  static List<ProjectPicture> listFrom(Map<String, dynamic> json) {
+    final photos = json['photos'] as List<dynamic>?;
+    final first = json['first_photo'] as Map<String, dynamic>?;
+    final fromRavelry = photos != null
+        ? [for (final photo in photos) ProjectPicture._fromRavelry(photo as Map<String, dynamic>)]
+        : [if (first != null) ProjectPicture._fromRavelry(first)];
+    final local = (json['local_photos'] as List<dynamic>? ?? const []).cast<String>();
+    return [...fromRavelry, for (final path in local) ProjectPicture(localPath: AppPaths.resolve(path))];
+  }
+
+  factory ProjectPicture._fromRavelry(Map<String, dynamic> photo) {
+    return ProjectPicture(
+      ravelryId: (photo['id'] as num?)?.toInt(),
+      url: _text(photo['medium_url']) ?? _text(photo['small_url']) ?? _text(photo['square_url']),
+      thumbnailUrl: _text(photo['square_url']) ?? _text(photo['small_url']) ?? _text(photo['thumbnail_url']),
+    );
+  }
+
+  final int? ravelryId;
+  final String? url;
+  final String? thumbnailUrl;
+  final String? localPath;
 }
 
 /// A pattern the knitter has queued to make later.

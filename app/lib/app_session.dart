@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'app_paths.dart';
 import 'auth/auth_service.dart';
 import 'data/local_database.dart';
 import 'data/local_projects.dart';
@@ -11,6 +13,8 @@ import 'data/sync_engine.dart';
 import 'library/library_models.dart';
 import 'library/library_store.dart';
 import 'library/pdf_files.dart';
+import 'projects/project_notes.dart';
+import 'projects/project_photos.dart';
 import 'notes/note_sheet.dart';
 import 'notes/notes_backup.dart';
 import 'notes/project_comments.dart';
@@ -54,7 +58,11 @@ class AppSession extends ChangeNotifier {
         steps = StepsStore(database),
         localProjects = LocalProjects(database) {
     this.stepBuilder = stepBuilder ?? StepBuilder(store: steps);
+    photos = ProjectPhotos(ravelry: sync.ravelry, database: database, localProjects: localProjects);
   }
+
+  /// Adds and removes project photos.
+  late final ProjectPhotos photos;
 
   /// Projects kept on this phone only.
   final LocalProjects localProjects;
@@ -484,7 +492,20 @@ class AppSession extends ChangeNotifier {
       });
       final ravelryId = (reply['project'] as Map<String, dynamic>?)?['id'] as int?;
       if (ravelryId == null) return 'Ravelry didn\'t confirm the new project.';
+      final localPhotos = (project['local_photos'] as List<dynamic>? ?? const []).cast<String>();
       await localProjects.moveTo(projectId, ravelryId);
+      // Photos kept on the phone go to the new Ravelry project too.
+      for (final saved in localPhotos) {
+        final file = File(AppPaths.resolve(saved));
+        if (!await file.exists()) continue;
+        try {
+          await photos.add(projectId: ravelryId, username: username, bytes: await file.readAsBytes(), fileName: saved);
+        } on Exception {
+          // A photo that can't be added is left on the phone, not lost.
+          continue;
+        }
+        await file.delete();
+      }
     } on RavelryUnreachable {
       return 'You\'re offline. Add it to Ravelry when you\'re connected.';
     } on RavelryError catch (error) {
@@ -539,14 +560,84 @@ class AppSession extends ChangeNotifier {
         notifyListeners();
         unawaited(refresh());
       case NoteDestination.projectNotes:
-        // The project list leaves out notes, so get them before adding a line.
-        await loadFullRecord(RecordType.project, projectId);
-        final current = projectById(projectId)?.notes ?? '';
-        final now = DateTime.now();
-        final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-        final line = '$date ${tag.commentBody(text)}';
-        await saveEdit(RecordType.project, projectId, {'notes': current.isEmpty ? line : '$current\n$line'});
+        await addProjectNote(projectId, tag.commentBody(text));
     }
+  }
+
+  // Project notes and photos -------------------------------------------------
+
+  /// Adds a dated note to a project's notes. Returns a message to show if it
+  /// couldn't be added.
+  Future<String?> addProjectNote(int projectId, String text) {
+    return _changeProjectNotes(projectId, (entries) => [...entries, datedNote(text, DateTime.now())]);
+  }
+
+  /// Changes one note ([text]) or removes it ([text] null).
+  Future<String?> editProjectNote(int projectId, int index, String? text) {
+    return _changeProjectNotes(projectId, (entries) {
+      final changed = [...entries];
+      if (index < 0 || index >= changed.length) return changed;
+      if (text == null || text.trim().isEmpty) {
+        changed.removeAt(index);
+      } else {
+        changed[index] = text.trim();
+      }
+      return changed;
+    });
+  }
+
+  Future<String?> _changeProjectNotes(int projectId, List<String> Function(List<String> entries) change) async {
+    await loadFullRecord(RecordType.project, projectId);
+    final project = projectById(projectId);
+    if (project == null) return 'This project is no longer here.';
+    // Ravelry keeps all notes in one field; changing it without having read
+    // it first would replace notes written on the website.
+    if (!project.notesLoaded) {
+      return 'This project\'s notes haven\'t loaded from Ravelry yet. Try again when you\'re online.';
+    }
+    await saveEdit(RecordType.project, projectId, {'notes': joinNoteEntries(change(noteEntries(project.notes)))});
+    return null;
+  }
+
+  /// Adds a photo to a project. Returns a message to show if it couldn't.
+  Future<String?> addProjectPhoto(int projectId, Uint8List bytes, String fileName) async {
+    try {
+      await photos.add(projectId: projectId, username: user?.username, bytes: bytes, fileName: fileName);
+    } on RavelryUnreachable {
+      return 'You\'re offline. Photos go to Ravelry, so add it when you\'re connected.';
+    } on RavelryError catch (error) {
+      return 'Ravelry couldn\'t add the photo (error ${error.statusCode}).';
+    } on SignInExpired {
+      return 'Your Ravelry sign-in ended. Sign in again from You.';
+    }
+    if (!LocalProjects.isLocal(projectId)) {
+      // Ravelry takes a few seconds to process a new photo before it lists it.
+      await Future<void>.delayed(const Duration(seconds: 4));
+      await loadFullRecord(RecordType.project, projectId);
+    }
+    await _loadFromDatabase();
+    notifyListeners();
+    return null;
+  }
+
+  /// Removes a photo. Returns a message to show if it couldn't.
+  Future<String?> deleteProjectPhoto(int projectId, ProjectPicture picture) async {
+    try {
+      final path = picture.localPath;
+      final photoId = picture.ravelryId;
+      if (path != null) {
+        await photos.deleteFromPhone(projectId: projectId, path: path);
+      } else if (photoId != null) {
+        await photos.deleteFromRavelry(projectId: projectId, photoId: photoId);
+      }
+    } on RavelryUnreachable {
+      return 'You\'re offline. Delete the photo when you\'re connected.';
+    } on RavelryError catch (error) {
+      return 'Ravelry couldn\'t delete the photo (error ${error.statusCode}).';
+    }
+    await _loadFromDatabase();
+    notifyListeners();
+    return null;
   }
 
   /// Comments on a project from Ravelry, or null when offline.

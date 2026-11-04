@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -99,6 +100,36 @@ class RavelryClient {
       body: Uri(queryParameters: fields).query,
       contentType: 'application/x-www-form-urlencoded',
     );
+  }
+
+  /// Uploads an image and returns Ravelry's image ID, for attaching it to a
+  /// project. Ravelry's upload takes a one-time upload token instead of the
+  /// knitter's access token.
+  Future<int> uploadImage(Uint8List bytes, String fileName) async {
+    final token = (await post('/upload/request_token.json', const {}))['upload_token'] as String?;
+    if (token == null) throw const RavelryError(500, '/upload/request_token.json');
+
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload/image.json'))
+      ..fields['upload_token'] = token
+      ..files.add(http.MultipartFile.fromBytes('file0', bytes, filename: fileName));
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(await _http.send(request));
+    } on Exception {
+      throw const RavelryUnreachable();
+    }
+    if (response.statusCode != 200) throw RavelryError(response.statusCode, '/upload/image.json');
+
+    // The reply is {"uploads": {"file0": {"image_id": 16}}}, sometimes with
+    // "uploads" as a list of such objects.
+    final uploads = (jsonDecode(response.body) as Map<String, dynamic>)['uploads'];
+    final entries = uploads is List ? uploads.cast<Map<String, dynamic>>() : [uploads as Map<String, dynamic>];
+    for (final entry in entries) {
+      final file = entry['file0'] as Map<String, dynamic>?;
+      final id = (file?['image_id'] as num?)?.toInt();
+      if (id != null) return id;
+    }
+    throw const RavelryError(500, '/upload/image.json');
   }
 
   /// DELETEs [path], such as one of the knitter's comments.

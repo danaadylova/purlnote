@@ -6,6 +6,10 @@
 	     doesn't need to ask about encryption on every build. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Purlnote adds the photos you choose to your projects.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Purlnote takes photos of your projects when you ask it to.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
