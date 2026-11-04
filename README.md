@@ -16,7 +16,7 @@ Purlnote is in beta on TestFlight, with the App Store release coming next.
 
 **Step by step**
 - Turns a pattern into one instruction at a time, with Back and Next.
-- Shows only your size's numbers, whether the pattern writes them as "88 (96, 104)", "88/96/104" or "31 33 35".
+- Pick your size once, and each step shows only your number: "Cast on 96 sts" instead of "Cast on 88 (96, 104) sts".
 - Choose where to start, so you can skip the pattern's introduction.
 - Made on the phone: by Apple's on-device model where it's available, and by built-in rules everywhere else. Patterns are never uploaded.
 
