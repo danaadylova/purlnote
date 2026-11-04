@@ -78,7 +78,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             const SizedBox(height: 16),
             Text(
               'Signing in brings your Ravelry projects, stash, queue and purchased patterns. '
-              'You can connect Ravelry later from You, or never.',
+              'You can connect Ravelry later from More, or never.',
               textAlign: TextAlign.center,
               style: text.bodySmall,
             ),

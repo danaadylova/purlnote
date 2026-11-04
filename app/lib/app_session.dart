@@ -155,14 +155,14 @@ class AppSession extends ChangeNotifier {
 
   /// Ends the first-launch tour, finished or skipped, and goes on to
   /// Welcome. The tour isn't shown at launch again; it stays available from
-  /// You.
+  /// More.
   Future<void> finishTutorial() async {
     await database.saveSetting(_tutorialSeenSetting, 'true');
     _moveTo(AppStage.signedOut);
   }
 
   /// Starts using Purlnote with everything kept on this phone. A Ravelry
-  /// account can be connected later from You.
+  /// account can be connected later from More.
   Future<void> startWithoutRavelry() async {
     await database.saveSetting(_withoutRavelrySetting, 'true');
     await _loadFromDatabase();
@@ -631,7 +631,7 @@ class AppSession extends ChangeNotifier {
     } on RavelryError catch (error) {
       return 'Ravelry couldn\'t add the photo (error ${error.statusCode}).';
     } on SignInExpired {
-      return 'Your Ravelry sign-in ended. Sign in again from You.';
+      return 'Your Ravelry sign-in ended. Sign in again from More.';
     }
     if (!LocalProjects.isLocal(projectId)) {
       // Ravelry takes a few seconds to process a new photo before it lists it.

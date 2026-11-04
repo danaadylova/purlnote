@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_session.dart';
 import 'library_screen.dart';
 import 'notebook_screen.dart';
-import 'you_screen.dart';
+import 'more_screen.dart';
 
 /// The tabs: Notebook, Library and You. Each tab keeps its place when the
 /// knitter switches away and back.
@@ -27,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           NotebookScreen(session: widget.session),
           LibraryScreen(session: widget.session),
-          YouScreen(session: widget.session),
+          MoreScreen(session: widget.session),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Notebook'),
           NavigationDestination(icon: Icon(Icons.local_library_outlined), selectedIcon: Icon(Icons.local_library), label: 'Library'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'You'),
+          NavigationDestination(icon: Icon(Icons.more_horiz), selectedIcon: Icon(Icons.more_horiz), label: 'More'),
         ],
       ),
     );

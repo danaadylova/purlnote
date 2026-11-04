@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../theme.dart';
 
-/// Where the hello page's "Write to me" button sends email.
-const contactEmail = 'danaadylova@gmail.com';
-
 /// A short tour of what Purlnote does, shown on the first launch and from
-/// You → How Purlnote works: a hello from the maker, then four pages on what
+/// More → How Purlnote works: a hello from the maker, then four pages on what
 /// the app does. Skip leaves at any point.
 class TutorialScreen extends StatefulWidget {
   const TutorialScreen({super.key, required this.onDone, this.doneLabel = 'Get started'});
@@ -31,9 +27,10 @@ class _TutorialScreenState extends State<TutorialScreen> {
       title: 'Hello!',
       body:
           'Thank you for downloading my app! I created it to easily follow patterns and keep my notes '
-          'organized in one place. Let me know if you have feature suggestions, or just want to reach out.',
+          'organized in one place. Let me know if you have feature suggestions, or just want to reach out: '
+          'you can always find me under More → Send feedback.',
       picture: _HelloPicture(),
-      extra: _WriteToMe(),
+      extra: _Signature(),
     ),
     _Page(
       title: 'Your patterns, always with you',
@@ -174,40 +171,21 @@ class _Dots extends StatelessWidget {
   }
 }
 
-/// Signs the hello page and opens Mail to write to the maker.
-class _WriteToMe extends StatelessWidget {
-  const _WriteToMe();
-
-  Future<void> _write(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final mail = Uri(scheme: 'mailto', path: contactEmail, query: 'subject=Purlnote');
-    final opened = await launchUrl(mail);
-    if (!opened) {
-      messenger.showSnackBar(const SnackBar(content: Text('No mail app found. You can write to $contactEmail.')));
-    }
-  }
+/// Signs the hello page.
+class _Signature extends StatelessWidget {
+  const _Signature();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Text(
-          '– Dana',
-          style: TextStyle(fontSize: 17, fontStyle: FontStyle.italic, color: PurlnoteColors.plum),
-        ),
-        const Spacer(),
-        TextButton.icon(
-          onPressed: () => _write(context),
-          icon: const Icon(Icons.mail_outline),
-          label: const Text('Write to me'),
-        ),
-      ],
+    return const Text(
+      '– Dana',
+      style: TextStyle(fontSize: 17, fontStyle: FontStyle.italic, color: PurlnoteColors.plum),
     );
   }
 }
 
-// The pictures are drawn with plain widgets, so they need no image files and
-// stay sharp at any size.
+// The how-to pictures are drawn with plain widgets, so they need no image
+// files and stay sharp at any size.
 
 /// A rounded panel the pictures sit on.
 class _Panel extends StatelessWidget {
@@ -270,49 +248,15 @@ class _Sheet extends StatelessWidget {
   }
 }
 
+/// Dana's photo of yarn and knitting.
 class _HelloPicture extends StatelessWidget {
   const _HelloPicture();
 
   @override
   Widget build(BuildContext context) {
-    return _Panel(
-      color: PurlnoteColors.plum,
-      child: Center(
-        child: Transform.rotate(
-          angle: -0.05,
-          child: Container(
-            width: 200,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: PurlnoteColors.cream,
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 18, offset: Offset(0, 8))],
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'p',
-                  style: TextStyle(
-                    color: PurlnoteColors.marigoldDark,
-                    fontSize: 56,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                ),
-                SizedBox(height: 14),
-                Text(
-                  'Made with love, one row at a time.',
-                  style: TextStyle(color: PurlnoteColors.plum, fontSize: 16, fontWeight: FontWeight.w600, height: 1.3),
-                ),
-                SizedBox(height: 12),
-                Icon(Icons.favorite, color: PurlnoteColors.blush, size: 22),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: Image.asset('assets/hello.jpg', fit: BoxFit.cover, alignment: const Alignment(0, -0.2)),
     );
   }
 }

@@ -1,13 +1,20 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app_session.dart';
 import '../theme.dart';
 import 'tutorial_screen.dart';
 
-/// The knitter's account: who is signed in, the Ravelry connection, and
-/// signing out.
-class YouScreen extends StatelessWidget {
-  const YouScreen({super.key, required this.session});
+/// Where feedback emails go.
+const feedbackEmail = 'unraveled.makes@gmail.com';
+
+/// Everything that isn't the Notebook or Library: sending feedback, the
+/// Ravelry account and backup, the tour, and signing out.
+class MoreScreen extends StatelessWidget {
+  const MoreScreen({super.key, required this.session});
 
   final AppSession session;
 
@@ -19,10 +26,18 @@ class YouScreen extends StatelessWidget {
         final user = session.user;
         final waiting = session.pendingEdits.length;
         return Scaffold(
-          appBar: AppBar(title: Semantics(header: true, child: const Text('You'))),
+          appBar: AppBar(title: Semantics(header: true, child: const Text('More'))),
           body: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.mail_outline),
+                title: const Text('Send feedback'),
+                subtitle: const Text('Ideas, bugs, or just hello. Goes to the person who makes Purlnote.'),
+                onTap: () => _sendFeedback(context),
+              ),
+              const Divider(),
               if (session.connected) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -98,6 +113,25 @@ class YouScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Opens Mail with the app version and iOS version filled in, which helps
+  /// with bug reports. The knitter sees and can change all of it before
+  /// sending.
+  Future<void> _sendFeedback(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final app = await PackageInfo.fromPlatform();
+    final details = 'Purlnote ${app.version} (${app.buildNumber}), ${Platform.operatingSystemVersion}';
+    final mail = Uri(
+      scheme: 'mailto',
+      path: feedbackEmail,
+      // Encoded by hand: Uri's queryParameters turns spaces into "+", which
+      // Mail shows as is.
+      query: 'subject=${Uri.encodeComponent('Purlnote feedback')}&body=${Uri.encodeComponent('\n\n\n$details')}',
+    );
+    if (!await launchUrl(mail)) {
+      messenger.showSnackBar(const SnackBar(content: Text('No mail app found. You can write to $feedbackEmail.')));
+    }
   }
 
   Future<void> _connect(BuildContext context) async {

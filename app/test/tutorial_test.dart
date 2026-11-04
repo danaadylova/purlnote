@@ -15,7 +15,7 @@ void main() {
     await showTour(tester, () => done++);
 
     expect(find.text('Hello!'), findsOneWidget);
-    expect(find.text('Write to me'), findsOneWidget);
+    expect(find.text('– Dana'), findsOneWidget);
     for (final title in ['Your patterns, always with you', 'Mark it up', 'Never lose your row', 'One step at a time']) {
       await tester.tap(find.widgetWithText(FilledButton, 'Next'));
       await tester.pumpAndSettle();
