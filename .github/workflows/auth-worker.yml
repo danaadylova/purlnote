@@ -45,17 +45,30 @@ jobs:
           RAVELRY_CLIENT_ID: ${{ secrets.RAVELRY_CLIENT_ID }}
           RAVELRY_CLIENT_SECRET: ${{ secrets.RAVELRY_CLIENT_SECRET }}
         run: |
-          missing=""
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID RAVELRY_CLIENT_ID RAVELRY_CLIENT_SECRET; do
-            [ -n "${!name}" ] || missing="$missing $name"
-          done
-          if [ -n "$missing" ]; then
-            echo "::warning::Not deployed yet. Add these repository secrets:$missing"
-            echo "ready=false" >> "$GITHUB_OUTPUT"
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "cloudflare=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Not deployed. Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets."
+            echo "cloudflare=false" >> "$GITHUB_OUTPUT"
           fi
-      - if: steps.check.outputs.ready == 'true'
+          if [ -n "$RAVELRY_CLIENT_ID" ] && [ -n "$RAVELRY_CLIENT_SECRET" ]; then
+            echo "ravelry=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Deploying without Ravelry credentials; sign-in stays off until RAVELRY_CLIENT_ID and RAVELRY_CLIENT_SECRET are added."
+            echo "ravelry=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy (without Ravelry credentials yet)
+        if: steps.check.outputs.cloudflare == 'true' && steps.check.outputs.ravelry != 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: auth-worker
+          command: deploy
+
+      - name: Deploy with Ravelry credentials
+        if: steps.check.outputs.cloudflare == 'true' && steps.check.outputs.ravelry == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
