@@ -1,0 +1,13 @@
+name = "purlnote-auth"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[vars]
+# The only redirect the token endpoint accepts for the phone app.
+APP_REDIRECT_URI = "purlnote://oauth-callback"
+# The milestone 0 check page at /spike. Set to "false" after milestone 0.
+SPIKE_ENABLED = "true"
+
+# Secrets (set from GitHub Actions, never committed):
+#   RAVELRY_CLIENT_ID, RAVELRY_CLIENT_SECRET

@@ -1,0 +1,15 @@
+{
+  "name": "purlnote-auth-worker",
+  "private": true,
+  "type": "module",
+  "description": "Purlnote token-exchange function for Ravelry sign-in (Cloudflare Worker)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "engines": { "node": ">=20" },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

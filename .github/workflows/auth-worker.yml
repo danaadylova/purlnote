@@ -1,0 +1,70 @@
+name: auth-worker
+
+on:
+  push:
+    branches: [main]
+    paths: ["auth-worker/**", ".github/workflows/auth-worker.yml"]
+  pull_request:
+    paths: ["auth-worker/**", ".github/workflows/auth-worker.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-worker-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: auth-worker/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets are set
+        id: check
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RAVELRY_CLIENT_ID: ${{ secrets.RAVELRY_CLIENT_ID }}
+          RAVELRY_CLIENT_SECRET: ${{ secrets.RAVELRY_CLIENT_SECRET }}
+        run: |
+          missing=""
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID RAVELRY_CLIENT_ID RAVELRY_CLIENT_SECRET; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Not deployed yet. Add these repository secrets:$missing"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: auth-worker
+          command: deploy
+          secrets: |
+            RAVELRY_CLIENT_ID
+            RAVELRY_CLIENT_SECRET
+        env:
+          RAVELRY_CLIENT_ID: ${{ secrets.RAVELRY_CLIENT_ID }}
+          RAVELRY_CLIENT_SECRET: ${{ secrets.RAVELRY_CLIENT_SECRET }}

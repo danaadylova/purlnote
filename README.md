@@ -1,0 +1,37 @@
+# Purlnote
+
+An offline-first iPhone app (Flutter, so Android can follow) that works as a phone client for a Ravelry account: projects, stash, the pattern library, and a pattern reader whose notes can go straight to a project's comments.
+
+- RFC: https://claude.ai/artifact/KAwWSUXfJyNHus1mrKcv72
+- Mockups: https://claude.ai/artifact/WNX9BhebaHSEhYCzD9Q1FL
+
+## What's here
+
+| Folder | What it is |
+| --- | --- |
+| `auth-worker/` | The sign-in function (Cloudflare Worker). Holds Ravelry's client secret so the app doesn't have to. Also serves the milestone 0 check page at `/spike`. |
+| `.github/workflows/` | Tests the function on every push and deploys it to Cloudflare from `main`. |
+
+The Flutter app arrives with milestone 1.
+
+## Milestones
+
+0. **Spike** (now): sign-in, refresh, profile, notes-backup size, one PDF download and one project comment, checked against the real Ravelry API. Go/no-go for the rest.
+1. Sign-in and read-only notebook.
+2. Editing and sync.
+3. Pattern library and reader.
+4. Notes to project comments, then closed beta.
+5. Step-by-step instructions (after launch).
+
+## Setting up milestone 0
+
+Only Dana does these; Claude never handles the secrets.
+
+1. **Cloudflare**: free account. Create an API token from the "Edit Cloudflare Workers" template and note the account ID.
+2. **Ravelry**: an OAuth 2.0 app with two redirect URIs:
+   - `purlnote://oauth-callback` (the phone app)
+   - `https://purlnote-auth.<your-subdomain>.workers.dev/spike/callback` (the check page)
+3. **GitHub** › Settings › Secrets and variables › Actions, add:
+   `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `RAVELRY_CLIENT_ID`, `RAVELRY_CLIENT_SECRET`.
+4. Re-run the latest **auth-worker** workflow (Actions tab). It deploys once the secrets are there.
+5. Open `https://purlnote-auth.<your-subdomain>.workers.dev/spike`, choose the optional checks, sign in, and paste the results table back to Claude. Delete the test comment on Ravelry afterwards.
