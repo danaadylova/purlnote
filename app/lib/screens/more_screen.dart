@@ -108,6 +108,7 @@ class MoreScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              _HiddenCommentsRow(session: session),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.privacy_tip_outlined),
@@ -250,6 +251,30 @@ class _BackupSwitchState extends State<_BackupSwitch> {
       ),
       value: _enabled ?? true,
       onChanged: _enabled == null ? null : _change,
+    );
+  }
+}
+
+/// Shown once any comments are hidden: brings them all back.
+class _HiddenCommentsRow extends StatelessWidget {
+  const _HiddenCommentsRow({required this.session});
+
+  final AppSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: session.hasHiddenComments(),
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.visibility_outlined),
+          title: const Text('Show hidden comments'),
+          subtitle: const Text('Comments and people you chose to hide on your projects.'),
+          onTap: session.showHiddenComments,
+        );
+      },
     );
   }
 }

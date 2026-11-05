@@ -688,13 +688,73 @@ class AppSession extends ChangeNotifier {
   }
 
   /// Comments on a project from Ravelry, or null when offline.
+  // Other people's comments ----------------------------------------------
+
+  static const _hiddenCommentsSetting = 'hidden_comments';
+  static const _mutedAuthorsSetting = 'muted_comment_authors';
+
+  Future<Set<int>> _numbersSetting(String name) async {
+    final saved = await database.setting(name);
+    return saved == null ? {} : (jsonDecode(saved) as List).cast<int>().toSet();
+  }
+
+  Future<Set<String>> _namesSetting(String name) async {
+    final saved = await database.setting(name);
+    return saved == null ? {} : (jsonDecode(saved) as List).cast<String>().toSet();
+  }
+
+  /// Stops showing one comment someone else left on a project. Only on this
+  /// device: the comment stays on Ravelry.
+  Future<void> hideComment(int commentId) async {
+    final hidden = await _numbersSetting(_hiddenCommentsSetting)..add(commentId);
+    await database.saveSetting(_hiddenCommentsSetting, jsonEncode(hidden.toList()));
+    notifyListeners();
+  }
+
+  /// Stops showing every comment from [author], on all projects.
+  Future<void> hideCommentsFrom(String author) async {
+    final muted = await _namesSetting(_mutedAuthorsSetting)..add(author);
+    await database.saveSetting(_mutedAuthorsSetting, jsonEncode(muted.toList()));
+    notifyListeners();
+  }
+
+  /// Whether any comments or people's comments are hidden.
+  Future<bool> hasHiddenComments() async =>
+      (await _numbersSetting(_hiddenCommentsSetting)).isNotEmpty ||
+      (await _namesSetting(_mutedAuthorsSetting)).isNotEmpty;
+
+  /// Shows every hidden comment again.
+  Future<void> showHiddenComments() async {
+    await database.saveSetting(_hiddenCommentsSetting, '[]');
+    await database.saveSetting(_mutedAuthorsSetting, '[]');
+    notifyListeners();
+  }
+
+  /// The project's page on Ravelry, where comments can be deleted or
+  /// reported.
+  Uri? ravelryPageFor(Project project) {
+    final username = user?.username;
+    if (username == null) return null;
+    final projects = 'https://www.ravelry.com/projects/$username';
+    final permalink = project.permalink;
+    return Uri.parse(permalink == null ? projects : '$projects/$permalink');
+  }
+
+  /// Comments on a project, without those the knitter chose to hide.
   Future<List<RavelryComment>?> loadComments(int projectId) async {
     if (!connected || LocalProjects.isLocal(projectId)) return null;
     final username = user?.username;
     final service = comments;
     if (username == null || service == null) return null;
     try {
-      return await service.load(username: username, projectId: projectId);
+      final loaded = await service.load(username: username, projectId: projectId);
+      final hidden = await _numbersSetting(_hiddenCommentsSetting);
+      final muted = await _namesSetting(_mutedAuthorsSetting);
+      return [
+        for (final comment in loaded)
+          if (comment.author == username || (!hidden.contains(comment.id) && !muted.contains(comment.author)))
+            comment,
+      ];
     } on RavelryUnreachable {
       return null;
     } on RavelryError {

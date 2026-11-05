@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app_session.dart';
 import '../data/local_database.dart';
@@ -431,6 +432,18 @@ class _CommentsSectionState extends State<_CommentsSection> {
             comment: comment,
             isMine: comment.author == username,
             onOpenPattern: _openAt,
+            onHide: () async {
+              await widget.session.hideComment(comment.id);
+              await _load();
+            },
+            onHideAuthor: () async {
+              await widget.session.hideCommentsFrom(comment.author!);
+              await _load();
+            },
+            onReport: () async {
+              final page = widget.session.ravelryPageFor(widget.project);
+              if (page != null) await launchUrl(page, mode: LaunchMode.externalApplication);
+            },
             onDelete: () async {
               final problem = await widget.session.deleteComment(comment.id);
               if (problem != null && context.mounted) {
@@ -450,12 +463,21 @@ class _CommentTile extends StatelessWidget {
     required this.isMine,
     required this.onOpenPattern,
     required this.onDelete,
+    required this.onHide,
+    required this.onHideAuthor,
+    required this.onReport,
   });
 
   final RavelryComment comment;
   final bool isMine;
   final ValueChanged<NoteTag> onOpenPattern;
   final VoidCallback onDelete;
+
+  /// For someone else's comment: hide it, hide everything from its author,
+  /// or open the project on Ravelry to delete or report it there.
+  final VoidCallback onHide;
+  final VoidCallback onHideAuthor;
+  final VoidCallback onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -485,6 +507,18 @@ class _CommentTile extends StatelessWidget {
                     tooltip: 'Delete comment',
                     icon: const Icon(Icons.delete_outline, size: 20),
                     onPressed: onDelete,
+                  )
+                else
+                  PopupMenuButton<VoidCallback>(
+                    tooltip: 'Hide or report',
+                    icon: const Icon(Icons.more_horiz, size: 20),
+                    onSelected: (action) => action(),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(value: onHide, child: const Text('Hide this comment')),
+                      if (comment.author != null)
+                        PopupMenuItem(value: onHideAuthor, child: Text('Hide comments from ${comment.author}')),
+                      PopupMenuItem(value: onReport, child: const Text('Delete or report on Ravelry')),
+                    ],
                   ),
               ],
             ),
