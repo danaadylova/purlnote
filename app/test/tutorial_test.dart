@@ -3,10 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:purlnote/screens/tutorial_screen.dart';
 import 'package:purlnote/theme.dart';
 
+import 'support/fakes.dart';
+
 void main() {
   Future<void> showTour(WidgetTester tester, void Function() onDone) async {
-    await tester.binding.setSurfaceSize(const Size(430, 932));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    useScreenSize(tester, const Size(430, 932));
     await tester.pumpWidget(MaterialApp(theme: buildPurlnoteTheme(), home: TutorialScreen(onDone: onDone)));
   }
 

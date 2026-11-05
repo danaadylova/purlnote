@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:purlnote/auth/auth_service.dart';
@@ -65,4 +67,13 @@ SyncEngine syncEngineFor({
     outbox: Outbox(ravelry: ravelry, database: database, clock: now),
     clock: now,
   );
+}
+
+/// Makes the test screen [size] logical pixels, as a phone or iPad of that
+/// size would report it, until the test ends. Layouts that depend on the
+/// screen width (the iPad's side rail and two columns) read this size.
+void useScreenSize(WidgetTester tester, Size size) {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
 }

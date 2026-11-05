@@ -24,8 +24,7 @@ void main() {
   }
 
   Future<void> showHome(WidgetTester tester, Size size) async {
-    await tester.binding.setSurfaceSize(size);
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    useScreenSize(tester, size);
     late AppSession session;
     late LocalDatabase database;
     await tester.runAsync(() async {

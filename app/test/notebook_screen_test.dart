@@ -30,8 +30,7 @@ void main() {
   Widget inApp(Widget screen) => MaterialApp(theme: buildPurlnoteTheme(), home: screen);
 
   testWidgets('the Notebook shows projects on the needles, finished ones, stash and queue', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1600));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    useScreenSize(tester, const Size(430, 1600));
     late AppSession session;
     late LocalDatabase database;
     await tester.runAsync(() async {
@@ -70,8 +69,7 @@ void main() {
     });
     session.signInProblem = 'Your Ravelry sign-in ended. Please sign in again.';
     // A phone-sized screen tall enough to show the whole welcome screen.
-    await tester.binding.setSurfaceSize(const Size(430, 1400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    useScreenSize(tester, const Size(430, 1400));
 
     await tester.pumpWidget(inApp(WelcomeScreen(session: session)));
 
