@@ -35,7 +35,7 @@
   <li>Step-by-step instructions, which are made on your device (by Apple's on-device model or by the app's own rules). Your patterns are never uploaded.</li>
   <li>Projects, notes and photos you keep without Ravelry</li>
 </ul>
-<p>Deleting the app deletes all of this data.</p>
+<p>Deleting the app deletes all of this data. Anything saved in your Ravelry account (see below) stays there until you remove it on Ravelry.</p>
 
 <h2>If you connect a Ravelry account</h2>
 <p>Connecting Ravelry is optional. If you do, the app reads and changes your Ravelry data only when you use it, and sends it directly to Ravelry:</p>
@@ -54,6 +54,7 @@
 
 <h2>Signing in</h2>
 <p>Ravelry sign-in happens on Ravelry's own page, in your device's secure sign-in window, so Purlnote never sees your password. Your sign-in tokens are kept in your device's secure keychain.</p>
+<p>The keychain can outlast the app: on iPhone and iPad, deleting an app doesn't remove what it saved there. Purlnote clears its old sign-in the next time it's installed, so a reinstalled app always starts signed out. To remove the sign-in straight away, sign out of Ravelry under More before deleting the app.</p>
 <p>Ravelry requires a private app key to complete sign-in, and an app on your device can't keep a key private. So one step of sign-in goes through a small function I run on Cloudflare: it adds the key and passes the request to Ravelry. It does not store or log your sign-in details. Like any web service, Cloudflare handles the network connection, including your IP address, to deliver the request.</p>
 
 <h2>Photos and camera</h2>
