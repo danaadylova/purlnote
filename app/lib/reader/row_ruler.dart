@@ -192,7 +192,11 @@ class _RulerOverlayState extends State<RulerOverlay> {
 /// steps (hold to keep moving), and make the band taller or shorter to fit
 /// the pattern's rows.
 class RulerControls extends StatelessWidget {
-  const RulerControls({super.key, required this.onMove, required this.onResize});
+  const RulerControls({super.key, required this.onMove, required this.onResize, this.compact = false});
+
+  /// Just the buttons, without the white bar and its label, for the floating
+  /// controls when the phone is sideways.
+  final bool compact;
 
   /// Called with -1 (up) or 1 (down), once per step.
   final ValueChanged<int> onMove;
@@ -202,6 +206,18 @@ class RulerControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _HoldButton(icon: Icons.keyboard_arrow_up, label: 'Move ruler up', onStep: () => onMove(-1)),
+          const SizedBox(width: 6),
+          _HoldButton(icon: Icons.keyboard_arrow_down, label: 'Move ruler down', onStep: () => onMove(1)),
+          IconButton(tooltip: 'Shorter ruler', onPressed: () => onResize(-1), icon: const Icon(Icons.unfold_less)),
+          IconButton(tooltip: 'Taller ruler', onPressed: () => onResize(1), icon: const Icon(Icons.unfold_more)),
+        ],
+      );
+    }
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),

@@ -66,6 +66,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// Showing the Steps view instead of the PDF page.
   ReaderView _view = ReaderView.page;
 
+  /// With the phone sideways, whether the floating controls are showing.
+  /// Tapping the page hides and shows them.
+  bool _controlsShown = true;
+
   @override
   void initState() {
     super.initState();
@@ -400,6 +404,13 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final file = _file;
     final noteCount = _marks.where((mark) => mark.kind == AnnotationKind.note).length;
 
+    if (!_loading && file != null && _isSideways(context)) {
+      return Listener(
+        onPointerDown: (_) => _awake.touched(),
+        child: Scaffold(backgroundColor: PurlnoteColors.sand, body: _sideways(file, noteCount)),
+      );
+    }
+
     return Listener(
       // Every touch keeps the screen awake a little longer.
       onPointerDown: (_) => _awake.touched(),
@@ -474,6 +485,141 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  /// A phone held sideways: too short for bars above and below the page.
+  /// (An iPad has room for them either way.)
+  bool _isSideways(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return size.width > size.height && !isWide(context);
+  }
+
+  /// The phone held sideways. The page fills the screen, and the controls
+  /// float in its corners: name and back at the top left, tools at the top
+  /// right, ruler arrows at the bottom left, the row counter at the bottom
+  /// right. Tapping the page hides them for a clear view, and shows them
+  /// again.
+  Widget _sideways(PatternFile file, int noteCount) {
+    final titleBar = _FloatingPanel(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const BackButton(),
+          Flexible(
+            child: Text(
+              widget.pattern.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('p. ${_page ?? 1}', style: const TextStyle(fontSize: 12, color: PurlnoteColors.plumMuted)),
+          IconButton(
+            tooltip: noteCount == 0 ? 'Notes' : '$noteCount notes',
+            onPressed: _showNotesList,
+            icon: Badge(isLabelVisible: noteCount > 0, label: Text('$noteCount'), child: const Icon(Icons.notes)),
+          ),
+          _AwakeMenu(minutes: _awake.minutes, onChanged: _setAwake),
+        ],
+      ),
+    );
+
+    if (_shownView(context) == ReaderView.steps) {
+      return SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Flexible(child: titleBar),
+                  const SizedBox(width: 8),
+                  _FloatingPanel(
+                    child: TextButton(
+                      onPressed: () => setState(() => _view = ReaderView.page),
+                      child: const Text('Page'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: _steps(file, sideBySide: false)),
+          ],
+        ),
+      );
+    }
+
+    final rulerOn = _ruler?.visible == true;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            // Only while no tool is in use, so drawing and pinning notes
+            // never hide the controls by accident.
+            onTap: _tool == ReaderTool.none ? () => setState(() => _controlsShown = !_controlsShown) : null,
+            child: _buildPages(file),
+          ),
+        ),
+        if (_controlsShown)
+          Positioned.fill(
+            child: SafeArea(
+              minimum: const EdgeInsets.all(8),
+              child: Stack(
+                children: [
+                  Positioned(left: 0, top: 0, right: 330, child: Align(alignment: Alignment.topLeft, child: titleBar)),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: _FloatingPanel(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final option in ReaderTool.values.where((t) => t != ReaderTool.none))
+                            _ToolButton(
+                              tool: option,
+                              compact: true,
+                              selected: option == ReaderTool.ruler ? rulerOn : _tool == option,
+                              onPressed: () => _chooseTool(option),
+                            ),
+                          const SizedBox(height: 28, child: VerticalDivider(width: 12, color: PurlnoteColors.line)),
+                          TextButton(
+                            onPressed: () => setState(() => _view = ReaderView.steps),
+                            child: const Text('Steps'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (rulerOn)
+                    Positioned(
+                      left: 0,
+                      bottom: 0,
+                      child: _FloatingPanel(
+                        child: RulerControls(compact: true, onMove: _moveRuler, onResize: _resizeRuler),
+                      ),
+                    ),
+                  if (_counters.isNotEmpty)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: CompactRowCounter(rows: _counters.first.value, onChanged: _setRows),
+                    ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _chooseTool(ReaderTool tool) {
+    if (tool == ReaderTool.ruler) {
+      _toggleRuler();
+    } else {
+      setState(() => _tool = _tool == tool ? ReaderTool.none : tool);
+    }
+  }
+
   /// The view to show: "Both" needs a wide screen, so after turning an
   /// iPad to a narrow split, it falls back to the page.
   ReaderView _shownView(BuildContext context) {
@@ -490,13 +636,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _Toolbar(
           tool: _tool,
           rulerOn: _ruler?.visible == true,
-          onTool: (tool) {
-            if (tool == ReaderTool.ruler) {
-              _toggleRuler();
-            } else {
-              setState(() => _tool = _tool == tool ? ReaderTool.none : tool);
-            }
-          },
+          onTool: _chooseTool,
         ),
       ],
     );
@@ -684,14 +824,41 @@ class _Toolbar extends StatelessWidget {
 }
 
 class _ToolButton extends StatelessWidget {
-  const _ToolButton({required this.tool, required this.selected, required this.onPressed});
+  const _ToolButton({required this.tool, required this.selected, required this.onPressed, this.compact = false});
 
   final ReaderTool tool;
   final bool selected;
   final VoidCallback onPressed;
 
+  /// Icon only, for the floating tools when the phone is sideways.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return Tooltip(
+        message: tool.label,
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: tool.label,
+          excludeSemantics: true,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onPressed,
+            child: Container(
+              width: 44,
+              height: 40,
+              decoration: BoxDecoration(
+                color: selected ? PurlnoteColors.blush : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(tool.icon, size: 22, color: PurlnoteColors.plum),
+            ),
+          ),
+        ),
+      );
+    }
     return Semantics(
       button: true,
       selected: selected,
@@ -720,6 +887,24 @@ class _ToolButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A small white panel floating over the page, for the sideways layout.
+class _FloatingPanel extends StatelessWidget {
+  const _FloatingPanel({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.95),
+      elevation: 3,
+      shadowColor: const Color(0x553B1C34),
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(padding: const EdgeInsets.all(4), child: child),
     );
   }
 }

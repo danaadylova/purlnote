@@ -39,6 +39,68 @@ class CountersBar extends StatelessWidget {
   }
 }
 
+/// The row counter as a small plum pill, floating over the page when the
+/// phone is sideways: "ROW − 14 +".
+class CompactRowCounter extends StatelessWidget {
+  const CompactRowCounter({super.key, required this.rows, required this.onChanged});
+
+  final int rows;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Row counter',
+      value: '$rows',
+      increasedValue: '${rows + 1}',
+      decreasedValue: '${rows > 0 ? rows - 1 : 0}',
+      onIncrease: () => onChanged(rows + 1),
+      onDecrease: () => onChanged(rows - 1),
+      child: Material(
+        color: PurlnoteColors.plum,
+        elevation: 4,
+        shadowColor: const Color(0x803B1C34),
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 6, 4),
+          child: ExcludeSemantics(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'ROW',
+                  style: TextStyle(color: PurlnoteColors.blush, fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  onPressed: () => onChanged(rows - 1),
+                  color: Colors.white,
+                  style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.14)),
+                  icon: const Icon(Icons.remove, size: 20),
+                ),
+                SizedBox(
+                  width: 44,
+                  child: Text(
+                    '$rows',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => onChanged(rows + 1),
+                  color: PurlnoteColors.plum,
+                  style: IconButton.styleFrom(backgroundColor: PurlnoteColors.marigold),
+                  icon: const Icon(Icons.add, size: 22),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RowCounter extends StatelessWidget {
   const _RowCounter({required this.rows, required this.onChanged});
 
