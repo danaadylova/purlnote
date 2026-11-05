@@ -64,6 +64,13 @@ void main() {
     expect(find.text('Harbour Raglan'), findsOneWidget);
   });
 
+  testWidgets('a big iPhone held sideways keeps the phone layout', (tester) async {
+    await showHome(tester, const Size(932, 430));
+
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
+  });
+
   testWidgets('the rail switches sections on an iPad', (tester) async {
     await showHome(tester, const Size(1376, 1032));
 
