@@ -141,7 +141,12 @@ class _NeedlesCardState extends State<_NeedlesCard> {
 
   Future<_CardDetails> _load() async {
     final pattern = await widget.session.patternForProject(widget.project);
-    final counters = await widget.session.reader.countersFor(widget.project.id);
+    final all = await widget.session.reader.existingCountersFor(widget.project.id);
+    // The row counter, then repeat counters.
+    final counters = [
+      ...all.where((counter) => !counter.isRepeat).take(1),
+      ...all.where((counter) => counter.isRepeat),
+    ];
     return (pattern: pattern != null && pattern.isOnPhone ? pattern : null, counters: counters);
   }
 

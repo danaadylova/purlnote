@@ -37,6 +37,14 @@ Future<void> main() async {
     tokenStore: SecureTokenStore(name: 'ravelry_pdf'),
     scopes: AuthService.pdfDownloadScopes,
   );
+  // iOS keeps the Keychain when an app is deleted, so a reinstalled app
+  // would find the old Ravelry sign-in. A brand-new database means a fresh
+  // install: start signed out, like everything else.
+  if (database.createdNow) {
+    await auth.signOut();
+    await pdfAuth.signOut();
+  }
+
   final pdfFiles = PdfFiles(
     library: LibraryStore(database),
     ravelry: ravelry,

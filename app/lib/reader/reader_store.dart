@@ -177,12 +177,34 @@ class ReaderStore {
 
   /// A project's counters, the row counter first. Creates the row counter the
   /// first time a project is opened in the reader.
-  Future<List<ProjectCounter>> countersFor(int projectId) async {
-    var rows = await _db.query('counter', where: 'project_id = ?', whereArgs: [projectId], orderBy: 'sort_order');
-    if (rows.isEmpty) {
-      await _db.insert('counter', {'project_id': projectId, 'label': 'Rows', 'value': 0, 'sort_order': 0});
-      rows = await _db.query('counter', where: 'project_id = ?', whereArgs: [projectId], orderBy: 'sort_order');
-    }
+  ///
+  /// Runs as one transaction, so two screens asking at the same moment can't
+  /// both create a row counter. A project that already got two (from before
+  /// this was fixed) keeps the one with the higher count.
+  Future<List<ProjectCounter>> countersFor(int projectId) {
+    return _db.transaction((txn) async {
+      var rows = await txn.query('counter', where: 'project_id = ?', whereArgs: [projectId], orderBy: 'sort_order, id');
+      if (rows.isEmpty) {
+        await txn.insert('counter', {'project_id': projectId, 'label': 'Rows', 'value': 0, 'sort_order': 0});
+      } else {
+        final rowCounters = rows.where((row) => row['every_n_rows'] == null).toList();
+        if (rowCounters.length > 1) {
+          rowCounters.sort((a, b) => (b['value'] as int).compareTo(a['value'] as int));
+          for (final extra in rowCounters.skip(1)) {
+            await txn.delete('counter', where: 'id = ?', whereArgs: [extra['id']]);
+          }
+          await txn.update('counter', {'sort_order': 0}, where: 'id = ?', whereArgs: [rowCounters.first['id']]);
+        }
+      }
+      rows = await txn.query('counter', where: 'project_id = ?', whereArgs: [projectId], orderBy: 'sort_order, id');
+      return rows.map(ProjectCounter.fromRow).toList();
+    });
+  }
+
+  /// A project's counters as they are, without creating any. For screens
+  /// that only show them, such as the Notebook's cards.
+  Future<List<ProjectCounter>> existingCountersFor(int projectId) async {
+    final rows = await _db.query('counter', where: 'project_id = ?', whereArgs: [projectId], orderBy: 'sort_order, id');
     return rows.map(ProjectCounter.fromRow).toList();
   }
 

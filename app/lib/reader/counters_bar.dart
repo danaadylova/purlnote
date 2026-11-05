@@ -23,7 +23,9 @@ class CountersBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rows = counters.first;
-    final repeats = counters.skip(1);
+    // Only counters that repeat every few rows; a stray second row counter
+    // would have nothing to repeat by.
+    final repeats = counters.skip(1).where((counter) => counter.isRepeat);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

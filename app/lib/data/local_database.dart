@@ -19,9 +19,13 @@ enum RecordType { user, project, queuedProject, stash, projectStatus, libraryVol
 /// It also holds what only the phone has: pattern files, reading spots,
 /// annotations and counters (see the library and reader stores).
 class LocalDatabase {
-  LocalDatabase._(this._db);
+  LocalDatabase._(this._db, {required this.createdNow});
 
   final Database _db;
+
+  /// True when the database didn't exist and was just made: the first launch
+  /// after installing the app, including after deleting and reinstalling it.
+  final bool createdNow;
 
   static const _fileName = 'purlnote.db';
   static const _version = 7;
@@ -32,11 +36,13 @@ class LocalDatabase {
   static Future<LocalDatabase> open({DatabaseFactory? factory, String? path}) async {
     final dbFactory = factory ?? databaseFactory;
     final dbPath = path ?? p.join(await dbFactory.getDatabasesPath(), _fileName);
+    var createdNow = false;
     final db = await dbFactory.openDatabase(
       dbPath,
       options: OpenDatabaseOptions(
         version: _version,
         onCreate: (db, version) async {
+          createdNow = true;
           await _createVersion1(db);
           await _addPendingEdits(db);
           await _addPatternsAndReading(db);
@@ -55,7 +61,7 @@ class LocalDatabase {
         },
       ),
     );
-    return LocalDatabase._(db);
+    return LocalDatabase._(db, createdNow: createdNow);
   }
 
   static Future<void> _createVersion1(Database db) async {

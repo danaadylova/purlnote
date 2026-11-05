@@ -81,6 +81,23 @@ void main() {
       expect(counters.single.isRepeat, isFalse);
     });
 
+    test('two screens opening a project at once get one row counter between them', () async {
+      final both = await Future.wait([store.countersFor(10), store.countersFor(10)]);
+      expect(both.first.single.label, 'Rows');
+      expect(both.last.single.id, both.first.single.id);
+    });
+
+    test('a project that got two row counters keeps the one with the higher count', () async {
+      final first = (await store.countersFor(10)).single;
+      await store.setCounterValue(first.id, 5);
+      // How a doubled counter looked: a second "Rows" with no repeat interval.
+      await database.sqlite.insert('counter', {'project_id': 10, 'label': 'Rows', 'value': 2, 'sort_order': 0});
+      expect(await store.existingCountersFor(10), hasLength(2));
+
+      final repaired = await store.countersFor(10);
+      expect(repaired.single.value, 5);
+    });
+
     test('rows never go below zero', () async {
       final rows = (await store.countersFor(10)).single;
       await store.setCounterValue(rows.id, -1);
