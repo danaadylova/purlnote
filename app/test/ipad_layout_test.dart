@@ -77,5 +77,7 @@ void main() {
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
     expect(find.text('Send feedback'), findsOneWidget);
+    // Apple asks for the privacy policy to be reachable inside the app.
+    expect(find.text('Privacy policy'), findsOneWidget);
   });
 }

@@ -12,6 +12,10 @@ import 'tutorial_screen.dart';
 /// Where feedback emails go.
 const feedbackEmail = 'unraveled.makes@gmail.com';
 
+/// Purlnote's website pages.
+const privacyPolicyUrl = 'https://danaadylova.github.io/purlnote/privacy.html';
+const supportUrl = 'https://danaadylova.github.io/purlnote/support.html';
+
 /// Everything that isn't the Notebook or Library: sending feedback, the
 /// Ravelry account and backup, the tour, and signing out.
 class MoreScreen extends StatelessWidget {
@@ -104,9 +108,23 @@ class MoreScreen extends StatelessWidget {
                   ),
                 ),
               ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('Privacy policy'),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                onTap: () => _openWebPage(context, privacyPolicyUrl),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Help and support'),
+                trailing: const Icon(Icons.open_in_new, size: 18),
+                onTap: () => _openWebPage(context, supportUrl),
+              ),
               const SizedBox(height: 16),
               const Text(
-                'Purlnote is not made by or affiliated with Ravelry. PDFs and your notes on them stay on this phone.',
+                'Purlnote is not made by or affiliated with Ravelry. PDFs and your notes on them stay on this device.',
                 style: TextStyle(fontSize: 13, color: PurlnoteColors.plumMuted),
               ),
             ],
@@ -132,6 +150,14 @@ class MoreScreen extends StatelessWidget {
     );
     if (!await launchUrl(mail)) {
       messenger.showSnackBar(const SnackBar(content: Text('No mail app found. You can write to $feedbackEmail.')));
+    }
+  }
+
+  /// Opens one of Purlnote's web pages in Safari.
+  Future<void> _openWebPage(BuildContext context, String url) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+      messenger.showSnackBar(SnackBar(content: Text('Couldn\'t open $url')));
     }
   }
 
