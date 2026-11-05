@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_session.dart';
 import '../data/outbox.dart';
 import '../data/pending_edit.dart';
+import '../layout.dart';
 import '../theme.dart';
 import '../widgets/edit_widgets.dart';
 
@@ -36,7 +37,7 @@ class _EditConflictScreenState extends State<EditConflictScreen> {
     return Scaffold(
       appBar: AppBar(title: Semantics(header: true, child: const Text('Choose which to keep'))),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: readablePadding(context, const EdgeInsets.fromLTRB(16, 8, 16, 32)),
         children: [
           const Text(
             'You changed these on this phone, and they were also changed on Ravelry. '

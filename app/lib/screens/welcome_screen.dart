@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_session.dart';
+import '../layout.dart';
 import '../theme.dart';
 
 /// The first screen. Purlnote works fully on its own, so starting without an
@@ -34,6 +35,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
     return Scaffold(
       body: SafeArea(
+        minimum: readableSides(context, maxWidth: 560),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 48, 24, 32),
           children: [

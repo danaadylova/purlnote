@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_session.dart';
 import '../data/local_database.dart';
+import '../layout.dart';
 import '../ravelry/models.dart';
 import '../theme.dart';
 import '../widgets/edit_widgets.dart';
@@ -90,7 +91,7 @@ class _StashYarnScreenState extends State<StashYarnScreen> {
     return Scaffold(
       appBar: AppBar(actions: [TextButton(onPressed: _save, child: const Text('Save'))]),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: readablePadding(context, const EdgeInsets.fromLTRB(16, 0, 16, 32)),
         children: [
           if (pendingEdit != null) ...[
             PendingEditNotice(

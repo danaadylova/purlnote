@@ -6,6 +6,7 @@ import '../library/library_models.dart';
 import '../notes/note_sheet.dart';
 import '../notes/project_comments.dart';
 import '../steps/steps_view.dart';
+import '../layout.dart';
 import '../theme.dart';
 import 'awake_timer.dart';
 import 'counters_bar.dart';
@@ -63,7 +64,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _loading = true;
 
   /// Showing the Steps view instead of the PDF page.
-  bool _showSteps = false;
+  ReaderView _view = ReaderView.page;
 
   @override
   void initState() {
@@ -432,40 +433,27 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 ? const _NothingDownloaded()
                 : Column(
                     children: [
-                      _PageOrSteps(showSteps: _showSteps, onChanged: (steps) => setState(() => _showSteps = steps)),
+                      _ViewSwitch(
+                        view: _shownView(context),
+                        offerBoth: isWide(context),
+                        onChanged: (view) => setState(() => _view = view),
+                      ),
                       if (_files.length > 1)
                         _FileSwitcher(files: _files, current: file, onChanged: (f) => _showFile(f)),
-                      if (_showSteps)
-                        Expanded(
-                          child: StepsView(
-                            key: ValueKey('steps-${file.id}'),
-                            session: widget.session,
-                            fileSha256: file.sha256!,
-                            pdfPath: file.localPath!,
-                            projectId: _projectId,
-                            rows: _counters.isEmpty ? null : _counters.first.value,
-                            onRowsChanged: _counters.isEmpty ? null : _setRows,
-                            onShowPage: (page) => setState(() {
-                              _startPage = page;
-                              _showSteps = false;
-                            }),
-                          ),
-                        )
-                      else ...[
-                        Expanded(child: _buildPages(file)),
-                        if (_ruler?.visible == true) RulerControls(onMove: _moveRuler, onResize: _resizeRuler),
-                        _Toolbar(
-                          tool: _tool,
-                          rulerOn: _ruler?.visible == true,
-                          onTool: (tool) {
-                            if (tool == ReaderTool.ruler) {
-                              _toggleRuler();
-                            } else {
-                              setState(() => _tool = _tool == tool ? ReaderTool.none : tool);
-                            }
-                          },
-                        ),
-                      ],
+                      Expanded(
+                        child: switch (_shownView(context)) {
+                          ReaderView.page => _pageWithTools(file),
+                          ReaderView.steps => _steps(file, sideBySide: false),
+                          ReaderView.both => Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(flex: 5, child: _pageWithTools(file)),
+                                const VerticalDivider(width: 1, color: PurlnoteColors.line),
+                                Expanded(flex: 4, child: _steps(file, sideBySide: true)),
+                              ],
+                            ),
+                        },
+                      ),
                       if (_counters.isNotEmpty)
                         Container(
                           color: Colors.white,
@@ -486,6 +474,59 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  /// The view to show: "Both" needs a wide screen, so after turning an
+  /// iPad to a narrow split, it falls back to the page.
+  ReaderView _shownView(BuildContext context) {
+    if (_view == ReaderView.both && !isWide(context)) return ReaderView.page;
+    return _view;
+  }
+
+  /// The PDF, with the ruler controls and the drawing tools under it.
+  Widget _pageWithTools(PatternFile file) {
+    return Column(
+      children: [
+        Expanded(child: _buildPages(file)),
+        if (_ruler?.visible == true) RulerControls(onMove: _moveRuler, onResize: _resizeRuler),
+        _Toolbar(
+          tool: _tool,
+          rulerOn: _ruler?.visible == true,
+          onTool: (tool) {
+            if (tool == ReaderTool.ruler) {
+              _toggleRuler();
+            } else {
+              setState(() => _tool = _tool == tool ? ReaderTool.none : tool);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  /// The Steps view. Beside the page, "show on the page" turns the page
+  /// next to it; on its own, it switches to the page.
+  Widget _steps(PatternFile file, {required bool sideBySide}) {
+    return StepsView(
+      key: ValueKey('steps-${file.id}'),
+      session: widget.session,
+      fileSha256: file.sha256!,
+      pdfPath: file.localPath!,
+      projectId: _projectId,
+      rows: _counters.isEmpty ? null : _counters.first.value,
+      onRowsChanged: _counters.isEmpty ? null : _setRows,
+      onShowPage: (page) {
+        if (sideBySide) {
+          if (_viewer.isReady) _viewer.goToPage(pageNumber: page);
+        } else {
+          setState(() {
+            _startPage = page;
+            _page = page;
+            _view = ReaderView.page;
+          });
+        }
+      },
+    );
+  }
+
   Widget _buildPages(PatternFile file) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -495,7 +536,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
               file.localPath!,
               key: ValueKey(file.id),
               controller: _viewer,
-              initialPageNumber: _startPage,
+              // Opening at the current page keeps the place when switching
+              // between Page and Both rebuilds the viewer.
+              initialPageNumber: _page ?? _startPage,
               params: PdfViewerParams(
                 backgroundColor: PurlnoteColors.sand,
                 // While drawing, touches on the page draw instead of scrolling.
@@ -529,12 +572,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
   }
 }
 
-/// Switches between the PDF page and the Steps view.
-class _PageOrSteps extends StatelessWidget {
-  const _PageOrSteps({required this.showSteps, required this.onChanged});
+/// What the reader shows: the PDF page, the Steps view, or (on an iPad)
+/// both side by side.
+enum ReaderView { page, both, steps }
 
-  final bool showSteps;
-  final ValueChanged<bool> onChanged;
+/// Switches between Page, Steps and, with room for them, Both.
+class _ViewSwitch extends StatelessWidget {
+  const _ViewSwitch({required this.view, required this.offerBoth, required this.onChanged});
+
+  final ReaderView view;
+  final bool offerBoth;
+  final ValueChanged<ReaderView> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -542,14 +590,32 @@ class _PageOrSteps extends StatelessWidget {
       color: Colors.white,
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      child: SegmentedButton<bool>(
-        showSelectedIcon: false,
-        segments: const [
-          ButtonSegment(value: false, label: Text('Page'), icon: Icon(Icons.picture_as_pdf_outlined)),
-          ButtonSegment(value: true, label: Text('Steps'), icon: Icon(Icons.format_list_numbered)),
-        ],
-        selected: {showSteps},
-        onSelectionChanged: (selection) => onChanged(selection.first),
+      alignment: Alignment.center,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SegmentedButton<ReaderView>(
+          showSelectedIcon: false,
+          segments: [
+            const ButtonSegment(
+              value: ReaderView.page,
+              label: Text('Page'),
+              icon: Icon(Icons.picture_as_pdf_outlined),
+            ),
+            if (offerBoth)
+              const ButtonSegment(
+                value: ReaderView.both,
+                label: Text('Both'),
+                icon: Icon(Icons.vertical_split_outlined),
+              ),
+            const ButtonSegment(
+              value: ReaderView.steps,
+              label: Text('Steps'),
+              icon: Icon(Icons.format_list_numbered),
+            ),
+          ],
+          selected: {view},
+          onSelectionChanged: (selection) => onChanged(selection.first),
+        ),
       ),
     );
   }

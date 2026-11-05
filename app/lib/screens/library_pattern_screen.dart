@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_session.dart';
+import '../layout.dart';
 import '../library/library_models.dart';
 import '../library/pdf_files.dart';
 import '../reader/reader_screen.dart';
@@ -145,7 +146,7 @@ class _LibraryPatternScreenState extends State<LibraryPatternScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: readablePadding(context, const EdgeInsets.fromLTRB(16, 0, 16, 32)),
         children: [
           Semantics(header: true, child: Text(pattern.title, style: Theme.of(context).textTheme.headlineMedium)),
           if (pattern.author != null) Text(pattern.author!, style: const TextStyle(color: PurlnoteColors.plumMuted)),

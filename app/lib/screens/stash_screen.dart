@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_session.dart';
 import '../data/local_database.dart';
+import '../layout.dart';
 import '../ravelry/models.dart';
 import '../theme.dart';
 import 'stash_yarn_screen.dart';
@@ -28,7 +29,7 @@ class StashScreen extends StatelessWidget {
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: readablePadding(context, const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
                   itemCount: stash.length,
                   separatorBuilder: (context, index) => const Divider(height: 1),
                   itemBuilder: (context, index) => _StashRow(

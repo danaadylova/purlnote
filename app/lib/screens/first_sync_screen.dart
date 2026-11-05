@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_session.dart';
 import '../data/sync_engine.dart';
+import '../layout.dart';
 import '../theme.dart';
 
 /// Shown right after sign-in while the knitter's records are copied to the
@@ -19,6 +20,7 @@ class FirstSyncScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
+        minimum: readableSides(context, maxWidth: 560),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
           child: Column(

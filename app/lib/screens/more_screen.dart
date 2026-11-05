@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_session.dart';
+import '../layout.dart';
 import '../theme.dart';
 import 'tutorial_screen.dart';
 
@@ -28,7 +29,7 @@ class MoreScreen extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(title: Semantics(header: true, child: const Text('More'))),
           body: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: readablePadding(context, const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
             children: [
               ListTile(
                 contentPadding: EdgeInsets.zero,

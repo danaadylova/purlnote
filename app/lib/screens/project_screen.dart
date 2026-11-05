@@ -5,14 +5,17 @@ import 'package:image_picker/image_picker.dart';
 
 import '../app_session.dart';
 import '../data/local_database.dart';
-import '../ravelry/models.dart';
-import '../theme.dart';
-import '../widgets/edit_widgets.dart';
-import '../widgets/project_widgets.dart';
+import '../data/pending_edit.dart';
+import '../layout.dart';
 import '../library/library_models.dart';
 import '../notes/project_comments.dart';
 import '../projects/project_notes.dart';
+import '../ravelry/models.dart';
 import '../reader/reader_screen.dart';
+import '../theme.dart';
+import '../widgets/edit_widgets.dart';
+import '../widgets/project_cover.dart';
+import '../widgets/project_widgets.dart';
 import 'edit_conflict_screen.dart';
 import 'project_edit_screen.dart';
 
@@ -52,6 +55,25 @@ class _ProjectScreenState extends State<ProjectScreen> {
   }
 }
 
+/// The project's status, and "On this phone" for a project kept only here.
+class _StatusChips extends StatelessWidget {
+  const _StatusChips({required this.project});
+
+  final Project project;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = project.statusName;
+    return Wrap(
+      spacing: 8,
+      children: [
+        if (status != null) StatusChip(status: status),
+        if (project.isOnPhoneOnly) const StatusChip(status: 'On this phone'),
+      ],
+    );
+  }
+}
+
 class _ProjectDetails extends StatelessWidget {
   const _ProjectDetails({required this.session, required this.project});
 
@@ -65,6 +87,26 @@ class _ProjectDetails extends StatelessWidget {
     final progress = project.progressPercent;
     final pendingEdit = session.pendingEditFor(RecordType.project, project.id);
 
+    final Widget body;
+    if (isWide(context)) {
+      body = _wideLayout(context);
+    } else {
+      body = ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        children: [
+          ..._notices(context, pendingEdit),
+          _PhotoStrip(session: session, project: project),
+          const SizedBox(height: 16),
+          Semantics(header: true, child: Text(project.name, style: text.headlineMedium)),
+          if (status != null || project.isOnPhoneOnly) ...[
+            const SizedBox(height: 8),
+            _StatusChips(project: project),
+          ],
+          ..._details(context, progress),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         actions: [
@@ -77,51 +119,128 @@ class _ProjectDetails extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-        children: [
-          if (pendingEdit != null) ...[
-            PendingEditNotice(
-              edit: pendingEdit,
-              onResolve: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => EditConflictScreen(session: session, edit: pendingEdit),
-              )),
-              onDiscard: () => session.discardEdit(pendingEdit),
-            ),
-            const SizedBox(height: 16),
-          ],
-          _PhotoStrip(session: session, project: project),
-          const SizedBox(height: 16),
-          Semantics(header: true, child: Text(project.name, style: text.headlineMedium)),
-          if (status != null || project.isOnPhoneOnly) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
+      body: body,
+    );
+  }
+
+  /// A waiting or conflicting edit, shown above everything else.
+  List<Widget> _notices(BuildContext context, PendingEdit? pendingEdit) {
+    if (pendingEdit == null) return const [];
+    return [
+      PendingEditNotice(
+        edit: pendingEdit,
+        onResolve: () => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => EditConflictScreen(session: session, edit: pendingEdit),
+        )),
+        onDiscard: () => session.discardEdit(pendingEdit),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
+  /// Everything under the name: progress, the pattern, details, notes and
+  /// comments.
+  List<Widget> _details(BuildContext context, int? progress) {
+    return [
+      if (progress != null) ...[
+        const SizedBox(height: 20),
+        ProgressRow(percent: progress),
+      ],
+      const SizedBox(height: 20),
+      _OpenPatternButton(session: session, project: project),
+      const SizedBox(height: 12),
+      _Detail(label: 'Pattern', value: project.patternName),
+      _Detail(label: 'Craft', value: project.craftName),
+      _Detail(label: 'Size', value: project.size),
+      _Detail(label: 'Started', value: _formatDate(context, project.started)),
+      _Detail(label: 'Finished', value: _formatDate(context, project.completed)),
+      const SizedBox(height: 16),
+      _NotesSection(session: session, project: project),
+      const SizedBox(height: 24),
+      if (session.canCommentOn(project.id)) _CommentsSection(session: session, project: project),
+      if (project.isOnPhoneOnly) _PhoneOnlyActions(session: session, project: project),
+    ];
+  }
+
+  /// iPad: the cover photo with the name on it fills the left, photos
+  /// under it; everything else scrolls on the right.
+  Widget _wideLayout(BuildContext context) {
+    final pendingEdit = session.pendingEditFor(RecordType.project, project.id);
+    final hasStatus = project.statusName != null || project.isOnPhoneOnly;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: MediaQuery.sizeOf(context).width * 0.4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ProjectCover(project: project),
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          stops: [0.45, 1],
+                          colors: [Color(0x003B1C34), Color(0xE63B1C34)],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 28,
+                      right: 28,
+                      bottom: 28,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasStatus) _StatusChips(project: project),
+                          const SizedBox(height: 10),
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              project.name,
+                              style: const TextStyle(
+                                color: PurlnoteColors.cream,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w800,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                          if (project.patternName != null)
+                            Text(
+                              project.patternName!,
+                              style: const TextStyle(color: PurlnoteColors.blush, fontSize: 16),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _PhotoStrip(session: session, project: project),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ReadableWidth(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
               children: [
-                if (status != null) StatusChip(status: status),
-                if (project.isOnPhoneOnly) const StatusChip(status: 'On this phone'),
+                ..._notices(context, pendingEdit),
+                ..._details(context, project.progressPercent),
               ],
             ),
-          ],
-          if (progress != null) ...[
-            const SizedBox(height: 20),
-            ProgressRow(percent: progress),
-          ],
-          const SizedBox(height: 20),
-          _OpenPatternButton(session: session, project: project),
-          const SizedBox(height: 12),
-          _Detail(label: 'Pattern', value: project.patternName),
-          _Detail(label: 'Craft', value: project.craftName),
-          _Detail(label: 'Size', value: project.size),
-          _Detail(label: 'Started', value: _formatDate(context, project.started)),
-          _Detail(label: 'Finished', value: _formatDate(context, project.completed)),
-          const SizedBox(height: 16),
-          _NotesSection(session: session, project: project),
-          const SizedBox(height: 24),
-          if (session.canCommentOn(project.id)) _CommentsSection(session: session, project: project),
-          if (project.isOnPhoneOnly) _PhoneOnlyActions(session: session, project: project),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 

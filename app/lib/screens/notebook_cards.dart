@@ -21,6 +21,12 @@ class OnTheNeedlesCarousel extends StatefulWidget {
   /// Tall enough for the cover, the numbers and the button.
   static const height = 410.0;
 
+  /// A card's width when several sit side by side.
+  static const cardWidth = 340.0;
+
+  /// From this width the cards sit in a row instead of being swiped.
+  static const rowLayoutWidth = 700.0;
+
   @override
   State<OnTheNeedlesCarousel> createState() => _OnTheNeedlesCarouselState();
 }
@@ -39,6 +45,36 @@ class _OnTheNeedlesCarouselState extends State<OnTheNeedlesCarousel> {
   @override
   Widget build(BuildContext context) {
     final projects = widget.projects;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // With room for more than one card (iPad), lay them out in a row
+        // that scrolls sideways instead of one at a time.
+        if (constraints.maxWidth >= OnTheNeedlesCarousel.rowLayoutWidth) {
+          return SizedBox(
+            height: OnTheNeedlesCarousel.height,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: projects.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 18),
+              itemBuilder: (context, index) => SizedBox(
+                width: OnTheNeedlesCarousel.cardWidth,
+                child: _NeedlesCard(
+                  session: widget.session,
+                  project: projects[index],
+                  onOpen: () => widget.onOpen(projects[index]),
+                ),
+              ),
+            ),
+          );
+        }
+        return _swiped(projects);
+      },
+    );
+  }
+
+  /// One card at a time, swiped sideways, with dots.
+  Widget _swiped(List<Project> projects) {
     return Column(
       children: [
         SizedBox(

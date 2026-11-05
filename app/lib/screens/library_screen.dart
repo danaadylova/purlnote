@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart';
 
 import '../app_session.dart';
+import '../layout.dart';
 import '../library/library_models.dart';
 import '../library/pdf_files.dart';
 import '../theme.dart';
+import '../widgets/project_cover.dart';
 import 'library_pattern_screen.dart';
 
 /// How the library list is ordered.
@@ -119,13 +122,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
               Expanded(
                 child: patterns.isEmpty
                     ? _EmptyLibrary(searching: _search.text.isNotEmpty, onImport: _import)
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: patterns.length,
-                        separatorBuilder: (context, index) => const Divider(height: 1),
-                        itemBuilder: (context, index) =>
-                            _PatternRow(pattern: patterns[index], onTap: () => _open(patterns[index])),
-                      ),
+                    : isWide(context)
+                        ? GridView.builder(
+                            padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 240,
+                              mainAxisSpacing: 24,
+                              crossAxisSpacing: 22,
+                              childAspectRatio: 0.6,
+                            ),
+                            itemCount: patterns.length,
+                            itemBuilder: (context, index) =>
+                                _PatternCover(pattern: patterns[index], onTap: () => _open(patterns[index])),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: patterns.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1),
+                            itemBuilder: (context, index) =>
+                                _PatternRow(pattern: patterns[index], onTap: () => _open(patterns[index])),
+                          ),
               ),
             ],
           ),
@@ -143,12 +159,7 @@ class _PatternRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final where = pattern.source == PatternSource.imported
-        ? 'Imported'
-        : pattern.isOnPhone
-            ? 'On this phone'
-            : 'On Ravelry';
-    final details = [pattern.author, where].whereType<String>().join(' · ');
+    final details = _patternDetails(pattern);
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 4),
@@ -172,6 +183,89 @@ class _PatternRow extends StatelessWidget {
       title: Text(pattern.title, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(details),
       trailing: const Icon(Icons.chevron_right, color: PurlnoteColors.plumMuted),
+    );
+  }
+}
+
+/// Where a pattern is, in a few words: "Imported", "On this phone" or "On
+/// Ravelry", after the designer's name.
+String _patternDetails(LibraryPattern pattern) {
+  final where = pattern.source == PatternSource.imported
+      ? 'Imported'
+      : pattern.isOnPhone
+          ? 'On this phone'
+          : 'On Ravelry';
+  return [pattern.author, where].whereType<String>().join(' · ');
+}
+
+/// A pattern in the iPad grid: its cover, title and where it is.
+class _PatternCover extends StatelessWidget {
+  const _PatternCover({required this.pattern, required this.onTap});
+
+  final LibraryPattern pattern;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = KnittedFabric(color: yarnColorFor(pattern.key.hashCode));
+    final firstFile = pattern.files.where((file) => file.isDownloaded && file.localPath != null).firstOrNull;
+    final Widget cover;
+    if (pattern.coverUrl != null) {
+      cover = Image.network(
+        pattern.coverUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => placeholder,
+      );
+    } else if (firstFile != null) {
+      // The PDF's first page, which is usually the pattern's own cover.
+      cover = ColoredBox(
+        color: Colors.white,
+        child: PdfDocumentViewBuilder.file(
+          firstFile.localPath!,
+          builder: (context, document) => document == null
+              ? placeholder
+              : PdfPageView(document: document, pageNumber: 1, alignment: Alignment.topCenter),
+        ),
+      );
+    } else {
+      cover = placeholder;
+    }
+
+    return Semantics(
+      button: true,
+      label: '${pattern.title}. ${_patternDetails(pattern)}',
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [BoxShadow(color: Color(0x1A3B1C34), blurRadius: 18, offset: Offset(0, 6))],
+                ),
+                child: ClipRRect(borderRadius: BorderRadius.circular(16), child: SizedBox.expand(child: cover)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              pattern.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+            Text(
+              _patternDetails(pattern),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: PurlnoteColors.plumMuted, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

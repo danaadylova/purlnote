@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
 import '../theme.dart';
 
 /// A short tour of what Purlnote does, shown on the first launch and from
@@ -80,6 +81,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
+        minimum: readableSides(context, maxWidth: 560),
         child: Column(
           children: [
             Align(

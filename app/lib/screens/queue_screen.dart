@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../layout.dart';
 import '../ravelry/models.dart';
 import '../theme.dart';
 
@@ -14,7 +15,7 @@ class QueueScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Semantics(header: true, child: const Text('Queue'))),
       body: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: readablePadding(context, const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
         itemCount: queue.length,
         itemBuilder: (context, index) {
           final item = queue[index];
