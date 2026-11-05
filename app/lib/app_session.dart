@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -279,6 +280,8 @@ class AppSession extends ChangeNotifier {
     pendingEdits = await database.pendingEdits();
     lastSyncedAt = await database.lastSyncedAt();
     patterns = await library.patterns();
+    final order = await database.setting(_needlesOrderSetting);
+    _needlesOrder = order == null ? const [] : List<int>.unmodifiable(jsonDecode(order) as List);
   }
 
   // Editing ---------------------------------------------------------------
@@ -356,7 +359,28 @@ class AppSession extends ChangeNotifier {
   }
 
   /// Projects with status "In progress", for the top of the Notebook.
-  List<Project> get onTheNeedles => projects.where((project) => project.isOnTheNeedles).toList();
+  /// Projects on the needles, in the order the knitter arranged them. Ones
+  /// started since the last arranging come first, newest change first.
+  List<Project> get onTheNeedles {
+    final needles = projects.where((project) => project.isOnTheNeedles).toList();
+    int placeOf(Project project) => _needlesOrder.indexOf(project.id);
+    final arranged = needles.where((project) => placeOf(project) >= 0).toList()
+      ..sort((a, b) => placeOf(a).compareTo(placeOf(b)));
+    return [...needles.where((project) => placeOf(project) < 0), ...arranged];
+  }
+
+  /// Project IDs in the order chosen for the Notebook's cards.
+  List<int> _needlesOrder = const [];
+
+  static const _needlesOrderSetting = 'needles_order';
+
+  /// Saves a new order for the projects on the needles, such as after one is
+  /// dragged to the front.
+  Future<void> arrangeOnTheNeedles(List<int> projectIds) async {
+    _needlesOrder = List.unmodifiable(projectIds);
+    notifyListeners();
+    await database.saveSetting(_needlesOrderSetting, jsonEncode(projectIds));
+  }
 
   /// Finished projects, most recently finished first.
   List<Project> get finishedProjects {

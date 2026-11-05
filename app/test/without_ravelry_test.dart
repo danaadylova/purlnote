@@ -40,6 +40,26 @@ void main() {
   }
 
   group('using Purlnote without Ravelry', () {
+    test('projects on the needles keep the order the knitter arranged', () async {
+      final session = phoneOnlySession();
+      await session.startWithoutRavelry();
+      final hat = await session.createProject(name: 'Hat');
+      final socks = await session.createProject(name: 'Socks');
+      final shawl = await session.createProject(name: 'Shawl');
+
+      await session.arrangeOnTheNeedles([shawl, hat, socks]);
+      expect(session.onTheNeedles.map((project) => project.name), ['Shawl', 'Hat', 'Socks']);
+
+      // A project started after arranging comes first; the rest keep their order.
+      await session.createProject(name: 'Mitts');
+      expect(session.onTheNeedles.map((project) => project.name), ['Mitts', 'Shawl', 'Hat', 'Socks']);
+
+      // And the order is still there next launch.
+      final nextLaunch = phoneOnlySession();
+      await nextLaunch.start();
+      expect(nextLaunch.onTheNeedles.map((project) => project.name), ['Mitts', 'Shawl', 'Hat', 'Socks']);
+    });
+
     test('first launch: the tour, then Welcome; after "start on this phone" it opens straight to the app', () async {
       final session = phoneOnlySession();
       await session.start();

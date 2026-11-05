@@ -10,13 +10,22 @@ import '../widgets/project_cover.dart';
 /// The projects on the needles as big cards, swiped sideways one at a time,
 /// with dots showing which one is in view.
 class OnTheNeedlesCarousel extends StatefulWidget {
-  const OnTheNeedlesCarousel({super.key, required this.session, required this.projects, required this.onOpen});
+  const OnTheNeedlesCarousel({
+    super.key,
+    required this.session,
+    required this.projects,
+    required this.onOpen,
+    required this.onArrange,
+  });
 
   final AppSession session;
   final List<Project> projects;
 
   /// Opens a project's page.
   final ValueChanged<Project> onOpen;
+
+  /// Press and hold a card: rearrange the cards, starting with that one.
+  final ValueChanged<Project> onArrange;
 
   /// Tall enough for the cover, the numbers and the button.
   static const height = 410.0;
@@ -63,6 +72,7 @@ class _OnTheNeedlesCarouselState extends State<OnTheNeedlesCarousel> {
                   session: widget.session,
                   project: projects[index],
                   onOpen: () => widget.onOpen(projects[index]),
+                onArrange: () => widget.onArrange(projects[index]),
                 ),
               ),
             ),
@@ -90,6 +100,7 @@ class _OnTheNeedlesCarouselState extends State<OnTheNeedlesCarousel> {
                 session: widget.session,
                 project: projects[index],
                 onOpen: () => widget.onOpen(projects[index]),
+                onArrange: () => widget.onArrange(projects[index]),
               ),
             ),
           ),
@@ -126,11 +137,12 @@ class _OnTheNeedlesCarouselState extends State<OnTheNeedlesCarousel> {
 typedef _CardDetails = ({LibraryPattern? pattern, List<ProjectCounter> counters});
 
 class _NeedlesCard extends StatefulWidget {
-  const _NeedlesCard({required this.session, required this.project, required this.onOpen});
+  const _NeedlesCard({required this.session, required this.project, required this.onOpen, required this.onArrange});
 
   final AppSession session;
   final Project project;
   final VoidCallback onOpen;
+  final VoidCallback onArrange;
 
   @override
   State<_NeedlesCard> createState() => _NeedlesCardState();
@@ -180,6 +192,7 @@ class _NeedlesCardState extends State<_NeedlesCard> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: widget.onOpen,
+        onLongPress: widget.onArrange,
         child: FutureBuilder<_CardDetails>(
           future: _details,
           builder: (context, snapshot) {
@@ -415,4 +428,115 @@ const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
 String _shortDate(DateTime date) {
   final dayMonth = '${date.day} ${_months[date.month - 1]}';
   return date.year == DateTime.now().year ? dayMonth : '$dayMonth ${date.year}';
+}
+
+/// Rearranges the projects on the needles: drag a project by its handle (or
+/// press and hold it) to move it. [picked] is the project whose card was
+/// pressed, shown highlighted. Each move is saved straight away.
+Future<void> showArrangeNeedles(BuildContext context, AppSession session, {Project? picked}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: PurlnoteColors.cream,
+    builder: (context) => _ArrangeNeedles(session: session, picked: picked),
+  );
+}
+
+class _ArrangeNeedles extends StatefulWidget {
+  const _ArrangeNeedles({required this.session, this.picked});
+
+  final AppSession session;
+  final Project? picked;
+
+  @override
+  State<_ArrangeNeedles> createState() => _ArrangeNeedlesState();
+}
+
+class _ArrangeNeedlesState extends State<_ArrangeNeedles> {
+  late final List<Project> _order = widget.session.onTheNeedles;
+
+  void _move(int from, int to) {
+    setState(() {
+      // ReorderableListView counts the destination before the item is
+      // taken out.
+      final project = _order.removeAt(from);
+      _order.insert(to > from ? to - 1 : to, project);
+    });
+    widget.session.arrangeOnTheNeedles([for (final project in _order) project.id]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight, maxWidth: 560),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Semantics(
+                header: true,
+                child: Text('Arrange your projects', style: Theme.of(context).textTheme.titleLarge),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                'Drag a project up or down. The first one is the card you see first.',
+                style: TextStyle(color: PurlnoteColors.plumMuted),
+              ),
+            ),
+            Flexible(
+              child: ReorderableListView.builder(
+                shrinkWrap: true,
+                buildDefaultDragHandles: false,
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                itemCount: _order.length,
+                onReorder: _move,
+                itemBuilder: (context, index) {
+                  final project = _order[index];
+                  final picked = project.id == widget.picked?.id;
+                  return ReorderableDelayedDragStartListener(
+                    key: ValueKey(project.id),
+                    index: index,
+                    child: Card(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      color: picked ? PurlnoteColors.mossLight : Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: picked ? PurlnoteColors.moss : PurlnoteColors.line),
+                      ),
+                      child: ListTile(
+                        leading: SizedBox.square(
+                          dimension: 44,
+                          child: ProjectCover(project: project, borderRadius: BorderRadius.circular(10)),
+                        ),
+                        title: Text(project.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: index == 0 ? const Text('Shown first') : null,
+                        trailing: ReorderableDragStartListener(
+                          index: index,
+                          child: Semantics(
+                            label: 'Move ${project.name}',
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(Icons.drag_handle, color: PurlnoteColors.plumMuted),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

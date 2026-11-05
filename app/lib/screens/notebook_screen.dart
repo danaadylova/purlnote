@@ -41,9 +41,22 @@ class NotebookScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'On the needles · ${onTheNeedles.length}',
-                  style: const TextStyle(color: PurlnoteColors.plumMuted, fontWeight: FontWeight.w600),
+                Row(
+                  children: [
+                    Text(
+                      'On the needles · ${onTheNeedles.length}',
+                      style: const TextStyle(color: PurlnoteColors.plumMuted, fontWeight: FontWeight.w600),
+                    ),
+                    if (onTheNeedles.length > 1)
+                      TextButton(
+                        onPressed: () => showArrangeNeedles(context, session),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: const Text('Arrange'),
+                      ),
+                  ],
                 ),
                 Semantics(
                   header: true,
@@ -86,6 +99,7 @@ class NotebookScreen extends StatelessWidget {
           session: session,
           projects: onTheNeedles,
           onOpen: (project) => _openProject(context, project),
+          onArrange: (project) => showArrangeNeedles(context, session, picked: project),
         ),
       if (finished.isNotEmpty) ...[
         const _SectionTitle('Finished'),
