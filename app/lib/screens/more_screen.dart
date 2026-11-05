@@ -90,7 +90,8 @@ class MoreScreen extends StatelessWidget {
                   title: const Text('Connect a Ravelry account'),
                   subtitle: const Text(
                     'Optional. Adds your Ravelry projects, stash, queue and purchased patterns, '
-                    'and lets notes go to project comments. Nothing on this phone is removed.',
+                    'and lets notes go to project comments. They\'re kept on this device and sent only '
+                    'to Ravelry. Nothing on this device is removed.',
                   ),
                   onTap: () => _connect(context),
                 ),
@@ -125,7 +126,8 @@ class MoreScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Purlnote is not made by or affiliated with Ravelry. PDFs and your notes on them stay on this device.',
+                'Purlnote is made by Dana Adylova. It is not made by or affiliated with Ravelry. '
+                'PDFs and your notes on them stay on this device.',
                 style: TextStyle(fontSize: 13, color: PurlnoteColors.plumMuted),
               ),
             ],

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app_session.dart';
 import '../layout.dart';
 import '../theme.dart';
+import 'more_screen.dart' show privacyPolicyUrl;
 
 /// The first screen. Purlnote works fully on its own, so starting without an
 /// account is offered first and on equal footing; connecting Ravelry adds
@@ -80,13 +82,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             const SizedBox(height: 16),
             Text(
               'Signing in brings your Ravelry projects, stash, queue and purchased patterns. '
+              'They\'re kept on this device and sent only to Ravelry, never to anyone else. '
               'You can connect Ravelry later from More, or never.',
               textAlign: TextAlign.center,
               style: text.bodySmall,
             ),
-            const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: () => launchUrl(Uri.parse(privacyPolicyUrl), mode: LaunchMode.externalApplication),
+                child: const Text('Privacy policy'),
+              ),
+            ),
             Text(
-              'Purlnote is not made by or affiliated with Ravelry.',
+              'Purlnote is made by Dana Adylova. It is not made by or affiliated with Ravelry.',
               textAlign: TextAlign.center,
               style: text.bodySmall,
             ),
