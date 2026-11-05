@@ -457,12 +457,7 @@ class _ArrangeNeedlesState extends State<_ArrangeNeedles> {
   late final List<Project> _order = widget.session.onTheNeedles;
 
   void _move(int from, int to) {
-    setState(() {
-      // ReorderableListView counts the destination before the item is
-      // taken out.
-      final project = _order.removeAt(from);
-      _order.insert(to > from ? to - 1 : to, project);
-    });
+    setState(() => _order.insert(to, _order.removeAt(from)));
     widget.session.arrangeOnTheNeedles([for (final project in _order) project.id]);
   }
 
@@ -496,7 +491,7 @@ class _ArrangeNeedlesState extends State<_ArrangeNeedles> {
                 buildDefaultDragHandles: false,
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 itemCount: _order.length,
-                onReorder: _move,
+                onReorderItem: _move,
                 itemBuilder: (context, index) {
                   final project = _order[index];
                   final picked = project.id == widget.picked?.id;
