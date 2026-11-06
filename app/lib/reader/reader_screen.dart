@@ -82,6 +82,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   static const _barsHiddenSetting = 'reader_bars_hidden';
 
+  /// The tools tray's height as last laid out, so the page can end just
+  /// above it, with only the tray's rounded corners over the page.
+  double _trayHeight = 0;
+
+  double get _pageBottomInset {
+    final inset = _trayHeight - _ToolsTray.cornerRadius;
+    return inset > 0 ? inset : 0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -412,6 +421,21 @@ class _ReaderScreenState extends State<ReaderScreen> {
     widget.session.database.saveSetting(_barsHiddenSetting, shown ? 'false' : 'true');
   }
 
+  /// Scrolls the pattern so the ruler is in the middle of the screen, for
+  /// when the knitter has read ahead or zoomed elsewhere.
+  void _goToRuler() {
+    final ruler = _ruler;
+    if (ruler == null || !_viewer.isReady) return;
+    final pages = _viewer.layout.pageLayouts;
+    if (ruler.page < 1 || ruler.page > pages.length) return;
+    final page = pages[ruler.page - 1];
+    final middle = page.top + page.height * (ruler.top + ruler.height / 2);
+    _viewer.goToArea(
+      rect: Rect.fromLTWH(page.left, middle - 1, page.width, 2),
+      anchor: PdfPageAnchor.center,
+    );
+  }
+
   /// Taps on the page hide or show the bars, unless a tool is in use, so
   /// drawing or pinning a note never hides them by accident.
   VoidCallback? get _pageTap => _tool == ReaderTool.none ? () => _showControls(!_controlsShown) : null;
@@ -468,49 +492,69 @@ class _ReaderScreenState extends State<ReaderScreen> {
                   ),
                 ),
                 Expanded(
-                  child: SafeArea(
-                    // With the top bar hidden, keep the page clear of the
-                    // status bar.
-                    top: !shown,
-                    bottom: !showsPage,
-                    child: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : file == null
-                            ? const _NothingDownloaded()
-                            : switch (view) {
-                                ReaderView.page => _pageWithTools(file),
-                                ReaderView.steps => _steps(file, sideBySide: false),
-                                ReaderView.both => Row(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Expanded(flex: 5, child: _pageWithTools(file)),
-                                      const VerticalDivider(width: 1, color: PurlnoteColors.line),
-                                      Expanded(flex: 4, child: _steps(file, sideBySide: true)),
-                                    ],
-                                  ),
-                              },
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        // The page runs under the tray's rounded corners, so
+                        // the pattern shows around them.
+                        bottom: file != null && showsPage ? _pageBottomInset : 0,
+                        child: SafeArea(
+                          // With the top bar hidden, keep the page clear of
+                          // the status bar.
+                          top: !shown,
+                          bottom: !showsPage,
+                          child: _loading
+                              ? const Center(child: CircularProgressIndicator())
+                              : file == null
+                                  ? const _NothingDownloaded()
+                                  : switch (view) {
+                                      ReaderView.page => _pageWithTools(file),
+                                      ReaderView.steps => _steps(file, sideBySide: false),
+                                      ReaderView.both => Row(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            Expanded(flex: 5, child: _pageWithTools(file)),
+                                            const VerticalDivider(width: 1, color: PurlnoteColors.line),
+                                            Expanded(flex: 4, child: _steps(file, sideBySide: true)),
+                                          ],
+                                        ),
+                                    },
+                        ),
+                      ),
+                      if (file != null && showsPage)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: _MeasureHeight(
+                            onChanged: (height) {
+                              if (height != _trayHeight) setState(() => _trayHeight = height);
+                            },
+                            child: _Collapsing(
+                              shown: shown,
+                              fromTop: false,
+                              child: _ToolsTray(
+                                onHide: () => _showControls(false),
+                                ruler: _ruler?.visible == true
+                                    ? RulerControls(compact: true, onMove: _moveRuler, onResize: _resizeRuler)
+                                    : null,
+                                onGoToRuler: _goToRuler,
+                                tools: _Toolbar(tool: _tool, rulerOn: _ruler?.visible == true, onTool: _chooseTool),
+                                counters: _counters.isEmpty
+                                    ? null
+                                    : CountersBar(
+                                        counters: _counters,
+                                        onRowsChanged: _setRows,
+                                        onAddRepeat: _addRepeatCounter,
+                                        onRemove: _removeCounter,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (file != null && showsPage)
-                  _Collapsing(
-                    shown: shown,
-                    fromTop: false,
-                    child: _ToolsTray(
-                      onHide: () => _showControls(false),
-                      ruler: _ruler?.visible == true
-                          ? RulerControls(compact: true, onMove: _moveRuler, onResize: _resizeRuler)
-                          : null,
-                      tools: _Toolbar(tool: _tool, rulerOn: _ruler?.visible == true, onTool: _chooseTool),
-                      counters: _counters.isEmpty
-                          ? null
-                          : CountersBar(
-                              counters: _counters,
-                              onRowsChanged: _setRows,
-                              onAddRepeat: _addRepeatCounter,
-                              onRemove: _removeCounter,
-                            ),
-                    ),
-                  ),
               ],
             ),
             // With the bars hidden: back, a way to bring them back, and the
@@ -682,7 +726,17 @@ class _ReaderScreenState extends State<ReaderScreen> {
                       left: 0,
                       bottom: 0,
                       child: _FloatingPanel(
-                        child: RulerControls(compact: true, onMove: _moveRuler, onResize: _resizeRuler),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Go to the ruler',
+                              onPressed: _goToRuler,
+                              icon: const Icon(Icons.my_location),
+                            ),
+                            RulerControls(compact: true, onMove: _moveRuler, onResize: _resizeRuler),
+                          ],
+                        ),
                       ),
                     ),
                   if (_counters.isNotEmpty)
@@ -1170,12 +1224,23 @@ class _TopBar extends StatelessWidget {
 /// on), the drawing tools and the counters. Hide, or a swipe down on its
 /// handle, slides it away.
 class _ToolsTray extends StatelessWidget {
-  const _ToolsTray({required this.onHide, required this.ruler, required this.tools, required this.counters});
+  const _ToolsTray({
+    required this.onHide,
+    required this.ruler,
+    required this.onGoToRuler,
+    required this.tools,
+    required this.counters,
+  });
 
   final VoidCallback onHide;
   final Widget? ruler;
+
+  /// Scrolls the pattern back to where the ruler is.
+  final VoidCallback onGoToRuler;
   final Widget tools;
   final Widget? counters;
+
+  static const cornerRadius = 24.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1183,7 +1248,7 @@ class _ToolsTray extends StatelessWidget {
       color: Colors.white,
       elevation: 8,
       shadowColor: const Color(0x663B1C34),
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(cornerRadius)),
       child: SafeArea(
         top: false,
         child: Padding(
@@ -1236,6 +1301,11 @@ class _ToolsTray extends StatelessWidget {
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: PurlnoteColors.brown),
                         ),
                       ),
+                      IconButton(
+                        tooltip: 'Go to the ruler',
+                        onPressed: onGoToRuler,
+                        icon: const Icon(Icons.my_location, color: PurlnoteColors.brown),
+                      ),
                       ruler!,
                     ],
                   ),
@@ -1247,6 +1317,39 @@ class _ToolsTray extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Reports its child's height whenever it changes, such as while the tray
+/// slides in or out.
+class _MeasureHeight extends SingleChildRenderObjectWidget {
+  const _MeasureHeight({required this.onChanged, required super.child});
+
+  final ValueChanged<double> onChanged;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMeasureHeight(onChanged);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMeasureHeight renderObject) {
+    renderObject.onChanged = onChanged;
+  }
+}
+
+class _RenderMeasureHeight extends RenderProxyBox {
+  _RenderMeasureHeight(this.onChanged);
+
+  ValueChanged<double> onChanged;
+  double? _last;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final height = size.height;
+    if (height == _last) return;
+    _last = height;
+    // Not during layout: the page's size depends on this.
+    WidgetsBinding.instance.addPostFrameCallback((_) => onChanged(height));
   }
 }
 

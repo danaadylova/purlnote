@@ -31,7 +31,11 @@ class MoreScreen extends StatelessWidget {
         final user = session.user;
         final waiting = session.pendingEdits.length;
         return Scaffold(
-          appBar: AppBar(title: Semantics(header: true, child: const Text('More'))),
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            title: Semantics(header: true, child: const Text('More')),
+          ),
           body: ListView(
             padding: readablePadding(context, const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
             children: [

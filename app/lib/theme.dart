@@ -8,17 +8,27 @@ abstract final class PurlnoteColors {
   /// Secondary text.
   static const plumMuted = Color(0xFF6E5566);
 
-  /// Screen background.
-  static const cream = Color(0xFFFFF8EE);
+  /// Screen background: white with the faintest touch of plum. Also the
+  /// light text on plum.
+  static const cream = Color(0xFFFCFAFC);
 
-  /// Segmented controls and track backgrounds.
-  static const sand = Color(0xFFF1E6D8);
+  /// Segmented controls, panels and track backgrounds: a pale lilac.
+  static const sand = Color(0xFFF1E9F0);
 
   /// Dividers.
-  static const line = Color(0xFFEADDCB);
+  static const line = Color(0xFFE6DCE6);
 
-  /// Text-field borders (3.3:1 against cream, enough for WCAG 2.2 AA).
-  static const inputBorder = Color(0xFF9A8576);
+  /// Text-field borders (3.4:1 against the background, enough for WCAG 2.2 AA).
+  static const inputBorder = Color(0xFF958393);
+
+  /// The top of the plum fade behind the main tabs, turning to [cream] by
+  /// the bottom.
+  static const lilacMist = Color(0xFFF3E8F1);
+
+  /// The glow band: lighter plum where the light falls, deeper plum at the
+  /// far edge.
+  static const plumGlow = Color(0xFF6A3260);
+  static const plumDeep = Color(0xFF2A1325);
 
   /// Buttons, active tab, links.
   static const moss = Color(0xFF3F5C37);
@@ -37,6 +47,24 @@ abstract final class PurlnoteColors {
   static const blush = Color(0xFFF4CDBE);
   static const brown = Color(0xFF8A5A2B);
 }
+
+/// The soft fade behind the Notebook, Library and More: lilac at the top,
+/// near-white at the bottom.
+const plumFade = LinearGradient(
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+  stops: [0, 0.7],
+  colors: [PurlnoteColors.lilacMist, PurlnoteColors.cream],
+);
+
+/// The plum band at the top of the Notebook: light falls from the top left
+/// and fades to deep plum.
+const plumGlowBand = RadialGradient(
+  center: Alignment(-0.6, -1),
+  radius: 1.4,
+  stops: [0, 0.55, 1],
+  colors: [PurlnoteColors.plumGlow, PurlnoteColors.plum, PurlnoteColors.plumDeep],
+);
 
 ThemeData buildPurlnoteTheme() {
   final colors = ColorScheme.fromSeed(

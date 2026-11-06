@@ -82,7 +82,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       builder: (context, _) {
         final patterns = _shown(widget.session.patterns);
         return Scaffold(
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
+            backgroundColor: Colors.transparent,
             title: Semantics(header: true, child: const Text('Library')),
             actions: [
               TextButton.icon(onPressed: _import, icon: const Icon(Icons.file_open_outlined), label: const Text('Import PDF')),

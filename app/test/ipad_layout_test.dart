@@ -42,7 +42,7 @@ void main() {
     await showHome(tester, const Size(1376, 1032));
 
     expect(find.byType(NavigationRail), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.bySemanticsLabel('Library'), findsOneWidget, reason: 'the rail, and no tab bar as well');
 
     // Everything on the Notebook fits on one screen, side by side.
     expect(find.text('Harbour Raglan'), findsOneWidget);
@@ -59,16 +59,16 @@ void main() {
   testWidgets('an iPhone keeps the tabs along the bottom', (tester) async {
     await showHome(tester, const Size(430, 932));
 
-    expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
+    expect(find.bySemanticsLabel('Library'), findsOneWidget, reason: 'the floating tab bar');
     expect(find.text('Harbour Raglan'), findsOneWidget);
   });
 
   testWidgets('a big iPhone held sideways keeps the phone layout', (tester) async {
     await showHome(tester, const Size(932, 430));
 
-    expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
+    expect(find.bySemanticsLabel('Library'), findsOneWidget);
   });
 
   testWidgets('the rail switches sections on an iPad', (tester) async {

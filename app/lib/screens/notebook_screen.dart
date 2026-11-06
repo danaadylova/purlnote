@@ -45,12 +45,13 @@ class NotebookScreen extends StatelessWidget {
                   children: [
                     Text(
                       'On the needles · ${onTheNeedles.length}',
-                      style: const TextStyle(color: PurlnoteColors.plumMuted, fontWeight: FontWeight.w600),
+                      style: const TextStyle(color: PurlnoteColors.blush, fontWeight: FontWeight.w600),
                     ),
                     if (onTheNeedles.length > 1)
                       TextButton(
                         onPressed: () => showArrangeNeedles(context, session),
                         style: TextButton.styleFrom(
+                          foregroundColor: PurlnoteColors.marigold,
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
@@ -62,7 +63,7 @@ class NotebookScreen extends StatelessWidget {
                   header: true,
                   child: Text(
                     'Your notebook',
-                    style: text.headlineLarge?.copyWith(fontWeight: FontWeight.w800),
+                    style: text.headlineLarge?.copyWith(fontWeight: FontWeight.w800, color: PurlnoteColors.cream),
                   ),
                 ),
               ],
@@ -74,9 +75,30 @@ class NotebookScreen extends StatelessWidget {
     );
 
     final projectSections = <Widget>[
-      header,
+      // The plum glow band behind the header; the first project card sits
+      // across its lower edge.
+      _GlowBand(
+        child: Column(
+          children: [
+            header,
+            const SizedBox(height: 16),
+            if (onTheNeedles.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: _Empty('Nothing on the needles yet. Start one with the + button.'),
+              )
+            else
+              OnTheNeedlesCarousel(
+                session: session,
+                projects: onTheNeedles,
+                onOpen: (project) => _openProject(context, project),
+                onArrange: (project) => showArrangeNeedles(context, session, picked: project),
+              ),
+          ],
+        ),
+      ),
       Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
         child: Column(
           children: [
             if (session.syncProblem != null) _Banner(message: session.syncProblem!),
@@ -88,19 +110,6 @@ class NotebookScreen extends StatelessWidget {
           ],
         ),
       ),
-      const SizedBox(height: 16),
-      if (onTheNeedles.isEmpty)
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: _Empty('Nothing on the needles yet. Start one with the + button.'),
-        )
-      else
-        OnTheNeedlesCarousel(
-          session: session,
-          projects: onTheNeedles,
-          onOpen: (project) => _openProject(context, project),
-          onArrange: (project) => showArrangeNeedles(context, session, picked: project),
-        ),
       if (finished.isNotEmpty) ...[
         const _SectionTitle('Finished'),
         FinishedRow(projects: finished, onOpen: (project) => _openProject(context, project)),
@@ -140,7 +149,9 @@ class NotebookScreen extends StatelessWidget {
       // iPad: projects on the left, stash, queue and the rest in a column
       // on the right.
       return Scaffold(
+        backgroundColor: Colors.transparent,
         body: SafeArea(
+          top: false,
           bottom: false,
           child: RefreshIndicator(
             onRefresh: session.refresh,
@@ -149,7 +160,7 @@ class NotebookScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.only(top: 24, bottom: 32),
+                    padding: const EdgeInsets.only(bottom: 32),
                     children: projectSections,
                   ),
                 ),
@@ -172,12 +183,14 @@ class NotebookScreen extends StatelessWidget {
     }
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
+        top: false,
         bottom: false,
         child: RefreshIndicator(
           onRefresh: session.refresh,
           child: ListView(
-            padding: const EdgeInsets.only(top: 12, bottom: 32),
+            padding: const EdgeInsets.only(bottom: 32),
             children: [
               ...projectSections,
               Padding(
@@ -222,6 +235,40 @@ class NotebookScreen extends StatelessWidget {
   }
 }
 
+/// The plum glow behind the top of the Notebook: from under the status bar
+/// down to the middle of the first project card, with rounded lower
+/// corners.
+class _GlowBand extends StatelessWidget {
+  const _GlowBand({required this.child});
+
+  final Widget child;
+
+  /// How far the band reaches below the header: about half a project card.
+  static const _belowHeader = 170.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    return Stack(
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: top + 96 + _belowHeader,
+          child: const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: plumGlowBand,
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+            ),
+          ),
+        ),
+        Padding(padding: EdgeInsets.only(top: top + 12), child: child),
+      ],
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title, {this.count, this.padded = true});
 
@@ -246,7 +293,7 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/// The square plum "+" that starts a new project.
+/// The square marigold "+" that starts a new project.
 class _NewProjectButton extends StatelessWidget {
   const _NewProjectButton({required this.onPressed});
 
@@ -257,14 +304,14 @@ class _NewProjectButton extends StatelessWidget {
     return Tooltip(
       message: 'New project',
       child: Material(
-        color: PurlnoteColors.plum,
+        color: PurlnoteColors.marigold,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onPressed,
           child: const SizedBox.square(
             dimension: 48,
-            child: Icon(Icons.add, color: PurlnoteColors.marigold, size: 28, semanticLabel: 'New project'),
+            child: Icon(Icons.add, color: PurlnoteColors.plum, size: 28, semanticLabel: 'New project'),
           ),
         ),
       ),
