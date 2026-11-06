@@ -34,9 +34,6 @@ abstract final class PurlnoteColors {
   static const barLilacDeep = Color(0xFFECE2EA);
   static const barEdge = Color(0xFFE4D9E2);
 
-  /// The row ruler's lines and its tab.
-  static const rulerPlum = Color(0xFF7B4570);
-
   /// The glow band: lighter plum where the light falls, deeper plum at the
   /// far edge.
   static const plumGlow = Color(0xFF6A3260);

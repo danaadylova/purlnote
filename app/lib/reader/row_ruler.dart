@@ -76,8 +76,9 @@ class RulerPosition {
   }
 }
 
-/// The ruler drawn on one page: a faint plum wash across the row between two
-/// fine plum lines, with a small tab at the page's edge to hold it by. The
+/// The ruler drawn on one page: a soft marigold wash across the row between
+/// two fine gold lines, with a small marigold tab at the page's edge to hold
+/// it by. The
 /// rest of the pattern stays fully readable. Button moves are animated, so the
 /// eye can follow them.
 ///
@@ -144,9 +145,9 @@ class RulerOverlay extends StatelessWidget {
                         Positioned.fill(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: PurlnoteColors.plumGlow.withValues(alpha: dragging ? 0.18 : 0.1),
+                              color: PurlnoteColors.marigold.withValues(alpha: dragging ? 0.26 : 0.16),
                               border: Border.symmetric(
-                                horizontal: BorderSide(color: PurlnoteColors.rulerPlum, width: dragging ? 2.5 : 1.5),
+                                horizontal: BorderSide(color: PurlnoteColors.marigoldDark, width: dragging ? 2.5 : 1.5),
                               ),
                             ),
                           ),
@@ -161,7 +162,7 @@ class RulerOverlay extends StatelessWidget {
                               width: 8,
                               height: 20,
                               decoration: BoxDecoration(
-                                color: PurlnoteColors.rulerPlum,
+                                color: PurlnoteColors.marigold,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
