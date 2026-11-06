@@ -76,8 +76,9 @@ class RulerPosition {
   }
 }
 
-/// The ruler drawn on one page: a marigold band across the row, with the
-/// pattern left fully readable around it. Button moves are animated, so the
+/// The ruler drawn on one page: a faint plum wash across the row between two
+/// fine plum lines, with a small tab at the page's edge to hold it by. The
+/// rest of the pattern stays fully readable. Button moves are animated, so the
 /// eye can follow them.
 ///
 /// Press and hold the band to pick it up, then drag it to another row, on
@@ -137,13 +138,36 @@ class RulerOverlay extends StatelessWidget {
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: _grabMargin),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: PurlnoteColors.marigold.withValues(alpha: dragging ? 0.22 : 0.1),
-                        border: Border.symmetric(
-                          horizontal: BorderSide(color: PurlnoteColors.marigoldDark, width: dragging ? 3 : 2),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: PurlnoteColors.plumGlow.withValues(alpha: dragging ? 0.18 : 0.1),
+                              border: Border.symmetric(
+                                horizontal: BorderSide(color: PurlnoteColors.rulerPlum, width: dragging ? 2.5 : 1.5),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        // The tab at the right edge, to show it can be held.
+                        Positioned(
+                          right: 4,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: Container(
+                              width: 8,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: PurlnoteColors.rulerPlum,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -160,7 +184,16 @@ class RulerOverlay extends StatelessWidget {
 /// steps (hold to keep moving), and make the band taller or shorter to fit
 /// the pattern's rows.
 class RulerControls extends StatelessWidget {
-  const RulerControls({super.key, required this.onMove, required this.onResize, this.compact = false});
+  const RulerControls({
+    super.key,
+    required this.onMove,
+    required this.onResize,
+    this.compact = false,
+    this.onDark = false,
+  });
+
+  /// Light buttons, for the plum tools tray.
+  final bool onDark;
 
   /// Just the buttons, without the white bar and its label, for the floating
   /// controls when the phone is sideways.
@@ -175,14 +208,35 @@ class RulerControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (compact) {
+      final iconColor = onDark ? PurlnoteColors.cream : null;
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _HoldButton(icon: Icons.keyboard_arrow_up, label: 'Move ruler up', onStep: () => onMove(-1)),
+          _HoldButton(
+            icon: Icons.keyboard_arrow_up,
+            label: 'Move ruler up',
+            onStep: () => onMove(-1),
+            onDark: onDark,
+          ),
           const SizedBox(width: 6),
-          _HoldButton(icon: Icons.keyboard_arrow_down, label: 'Move ruler down', onStep: () => onMove(1)),
-          IconButton(tooltip: 'Shorter ruler', onPressed: () => onResize(-1), icon: const Icon(Icons.unfold_less)),
-          IconButton(tooltip: 'Taller ruler', onPressed: () => onResize(1), icon: const Icon(Icons.unfold_more)),
+          _HoldButton(
+            icon: Icons.keyboard_arrow_down,
+            label: 'Move ruler down',
+            onStep: () => onMove(1),
+            onDark: onDark,
+          ),
+          IconButton(
+            tooltip: 'Shorter ruler',
+            color: iconColor,
+            onPressed: () => onResize(-1),
+            icon: const Icon(Icons.unfold_less),
+          ),
+          IconButton(
+            tooltip: 'Taller ruler',
+            color: iconColor,
+            onPressed: () => onResize(1),
+            icon: const Icon(Icons.unfold_more),
+          ),
         ],
       );
     }
@@ -215,11 +269,12 @@ class RulerControls extends StatelessWidget {
 
 /// A button that steps once on tap and keeps stepping, slowly, while held.
 class _HoldButton extends StatefulWidget {
-  const _HoldButton({required this.icon, required this.label, required this.onStep});
+  const _HoldButton({required this.icon, required this.label, required this.onStep, this.onDark = false});
 
   final IconData icon;
   final String label;
   final VoidCallback onStep;
+  final bool onDark;
 
   @override
   State<_HoldButton> createState() => _HoldButtonState();
@@ -253,10 +308,10 @@ class _HoldButtonState extends State<_HoldButton> {
           width: 56,
           height: 44,
           decoration: BoxDecoration(
-            color: PurlnoteColors.mossLight,
+            color: widget.onDark ? Colors.white.withValues(alpha: 0.12) : PurlnoteColors.mossLight,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(widget.icon, color: PurlnoteColors.mossDark),
+          child: Icon(widget.icon, color: widget.onDark ? PurlnoteColors.cream : PurlnoteColors.mossDark),
         ),
       ),
     );

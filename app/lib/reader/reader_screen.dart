@@ -456,7 +456,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     if (!_loading && file != null && _isSideways(context)) {
       return Listener(
         onPointerDown: (_) => _awake.touched(),
-        child: Scaffold(backgroundColor: PurlnoteColors.sand, body: _sideways(file, noteCount)),
+        child: Scaffold(backgroundColor: PurlnoteColors.desk, body: _sideways(file, noteCount)),
       );
     }
 
@@ -468,7 +468,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       // Every touch keeps the screen awake a little longer.
       onPointerDown: (_) => _awake.touched(),
       child: Scaffold(
-        backgroundColor: PurlnoteColors.sand,
+        backgroundColor: PurlnoteColors.desk,
         body: Stack(
           children: [
             Column(
@@ -537,10 +537,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               child: _ToolsTray(
                                 onHide: () => _showControls(false),
                                 ruler: _ruler?.visible == true
-                                    ? RulerControls(compact: true, onMove: _moveRuler, onResize: _resizeRuler)
+                                    ? RulerControls(
+                                        compact: true,
+                                        onDark: true,
+                                        onMove: _moveRuler,
+                                        onResize: _resizeRuler,
+                                      )
                                     : null,
                                 onGoToRuler: _goToRuler,
-                                tools: _Toolbar(tool: _tool, rulerOn: _ruler?.visible == true, onTool: _chooseTool),
+                                tools: _Toolbar(
+                                  tool: _tool,
+                                  rulerOn: _ruler?.visible == true,
+                                  onTool: _chooseTool,
+                                  onDark: true,
+                                ),
                                 counters: _counters.isEmpty
                                     ? null
                                     : CountersBar(
@@ -548,6 +558,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                         onRowsChanged: _setRows,
                                         onAddRepeat: _addRepeatCounter,
                                         onRemove: _removeCounter,
+                                        onDark: true,
                                       ),
                               ),
                             ),
@@ -866,7 +877,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               // between Page and Both rebuilds the viewer.
               initialPageNumber: _page ?? _startPage,
               params: PdfViewerParams(
-                backgroundColor: PurlnoteColors.sand,
+                backgroundColor: PurlnoteColors.desk,
                 // While drawing, touches on the page draw instead of scrolling.
                 panEnabled: !_tool.drawsOnPage,
                 scaleEnabled: !_tool.drawsOnPage,
@@ -922,10 +933,15 @@ class _ViewSwitch extends StatelessWidget {
     if (compact) {
       return SegmentedButton<ReaderView>(
         showSelectedIcon: false,
-        style: const ButtonStyle(
+        style: ButtonStyle(
           visualDensity: VisualDensity.compact,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+          padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+          side: const WidgetStatePropertyAll(BorderSide(color: PurlnoteColors.barEdge)),
+          foregroundColor: const WidgetStatePropertyAll(PurlnoteColors.plum),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? Colors.white : PurlnoteColors.barLilacDeep,
+          ),
         ),
         segments: [
           const ButtonSegment(value: ReaderView.page, label: Text('Page')),
@@ -1006,16 +1022,19 @@ class _FileSwitcher extends StatelessWidget {
 }
 
 class _Toolbar extends StatelessWidget {
-  const _Toolbar({required this.tool, required this.rulerOn, required this.onTool});
+  const _Toolbar({required this.tool, required this.rulerOn, required this.onTool, this.onDark = false});
 
   final ReaderTool tool;
   final bool rulerOn;
   final ValueChanged<ReaderTool> onTool;
 
+  /// Cream tools with a marigold pill for the chosen one, on the plum tray.
+  final bool onDark;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: onDark ? null : Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         children: [
@@ -1025,6 +1044,7 @@ class _Toolbar extends StatelessWidget {
                 tool: option,
                 selected: option == ReaderTool.ruler ? rulerOn : tool == option,
                 onPressed: () => onTool(option),
+                onDark: onDark,
               ),
             ),
         ],
@@ -1034,11 +1054,18 @@ class _Toolbar extends StatelessWidget {
 }
 
 class _ToolButton extends StatelessWidget {
-  const _ToolButton({required this.tool, required this.selected, required this.onPressed, this.compact = false});
+  const _ToolButton({
+    required this.tool,
+    required this.selected,
+    required this.onPressed,
+    this.compact = false,
+    this.onDark = false,
+  });
 
   final ReaderTool tool;
   final bool selected;
   final VoidCallback onPressed;
+  final bool onDark;
 
   /// Icon only, for the floating tools when the phone is sideways.
   final bool compact;
@@ -1069,6 +1096,10 @@ class _ToolButton extends StatelessWidget {
         ),
       );
     }
+    // On the plum tray the chosen tool is a marigold pill with plum on it,
+    // and the others are cream.
+    final selectedColor = onDark ? PurlnoteColors.marigold : PurlnoteColors.blush;
+    final foreground = onDark && !selected ? PurlnoteColors.cream : PurlnoteColors.plum;
     return Semantics(
       button: true,
       selected: selected,
@@ -1080,17 +1111,21 @@ class _ToolButton extends StatelessWidget {
         child: Container(
           height: 52,
           decoration: BoxDecoration(
-            color: selected ? PurlnoteColors.blush : Colors.transparent,
+            color: selected ? selectedColor : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(tool.icon, size: 22, color: PurlnoteColors.plum),
+              Icon(tool.icon, size: 22, color: foreground),
               const SizedBox(height: 2),
               Text(
                 tool.label,
-                style: TextStyle(fontSize: 11, fontWeight: selected ? FontWeight.w700 : FontWeight.w400),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: foreground,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -1127,8 +1162,8 @@ class _Collapsing extends StatelessWidget {
 }
 
 /// The reader's top bar: back, the pattern and page, Page/Steps, keep
-/// awake, notes and, in Steps, a button that hides the bar. A soft shadow sets it
-/// above the page.
+/// awake, notes and, in Steps, a button that hides the bar. A pale lilac
+/// with a fine line under it, so it sits quietly above the page.
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.title,
@@ -1160,9 +1195,8 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final view = this.view;
     return Material(
-      color: Colors.white,
-      elevation: 3,
-      shadowColor: const Color(0x553B1C34),
+      color: PurlnoteColors.barLilac,
+      shape: const Border(bottom: BorderSide(color: PurlnoteColors.barEdge)),
       child: SafeArea(
         bottom: false,
         child: Column(
@@ -1220,8 +1254,8 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// The tools under the page, in a tray with rounded corners and a shadow so
-/// it's clear where the page ends: the ruler arrows (while the ruler is
+/// The tools under the page, in a plum tray with rounded corners so it's
+/// clear where the page ends, and marigold for what can be pressed: the ruler arrows (while the ruler is
 /// on), the drawing tools and the counters. Hide, or a swipe down on its
 /// handle, slides it away.
 class _ToolsTray extends StatelessWidget {
@@ -1245,75 +1279,90 @@ class _ToolsTray extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      elevation: 8,
-      shadowColor: const Color(0x663B1C34),
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(cornerRadius)),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onVerticalDragEnd: (details) {
-                  if ((details.primaryVelocity ?? 0) > 0) onHide();
-                },
-                child: SizedBox(
-                  height: 34,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 5,
-                        decoration: BoxDecoration(color: PurlnoteColors.line, borderRadius: BorderRadius.circular(3)),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: onHide,
-                          iconAlignment: IconAlignment.end,
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                          label: const Text('Hide'),
-                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: plumGlowBand,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(cornerRadius)),
+        boxShadow: [BoxShadow(color: Color(0x553B1C34), blurRadius: 16, offset: Offset(0, -2))],
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragEnd: (details) {
+                    if ((details.primaryVelocity ?? 0) > 0) onHide();
+                  },
+                  child: SizedBox(
+                    height: 34,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.28),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
                         ),
-                      ),
-                    ],
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: onHide,
+                            iconAlignment: IconAlignment.end,
+                            icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                            label: const Text('Hide'),
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              foregroundColor: PurlnoteColors.marigold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              if (ruler != null)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 4),
-                  padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
-                  decoration: BoxDecoration(
-                    color: PurlnoteColors.marigold.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'RULER',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: PurlnoteColors.brown),
+                if (ruler != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'ROW RULER',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                              color: PurlnoteColors.cream,
+                            ),
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Go to the ruler',
-                        onPressed: onGoToRuler,
-                        icon: const Icon(Icons.my_location, color: PurlnoteColors.brown),
-                      ),
-                      ruler!,
-                    ],
+                        IconButton(
+                          tooltip: 'Go to the ruler',
+                          onPressed: onGoToRuler,
+                          icon: const Icon(Icons.my_location, color: PurlnoteColors.marigold),
+                        ),
+                        ruler!,
+                      ],
+                    ),
                   ),
-                ),
-              tools,
-              if (counters != null) counters!,
-            ],
+                tools,
+                if (counters != null) counters!,
+              ],
+            ),
           ),
         ),
       ),

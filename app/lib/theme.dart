@@ -25,6 +25,18 @@ abstract final class PurlnoteColors {
   /// the bottom.
   static const lilacMist = Color(0xFFF3E8F1);
 
+  /// The surface the pattern pages lie on in the reader: a muted mauve, so
+  /// the white page reads as paper on a desk.
+  static const desk = Color(0xFFE7E0E6);
+
+  /// The reader's top bar and the segmented control in it.
+  static const barLilac = Color(0xFFF6F1F5);
+  static const barLilacDeep = Color(0xFFECE2EA);
+  static const barEdge = Color(0xFFE4D9E2);
+
+  /// The row ruler's lines and its tab.
+  static const rulerPlum = Color(0xFF7B4570);
+
   /// The glow band: lighter plum where the light falls, deeper plum at the
   /// far edge.
   static const plumGlow = Color(0xFF6A3260);

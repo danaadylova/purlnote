@@ -12,7 +12,11 @@ class CountersBar extends StatelessWidget {
     required this.onRowsChanged,
     required this.onAddRepeat,
     required this.onRemove,
+    this.onDark = false,
   });
+
+  /// Light text, subtle panels and marigold buttons, for the plum tools tray.
+  final bool onDark;
 
   /// The row counter first, then repeat counters.
   final List<ProjectCounter> counters;
@@ -30,10 +34,15 @@ class CountersBar extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _RowCounter(rows: rows.value, onChanged: onRowsChanged),
+        _RowCounter(rows: rows.value, onChanged: onRowsChanged, onDark: onDark),
         for (final repeat in repeats)
-          _RepeatCounter(counter: repeat, rows: rows.value, onRemove: () => onRemove(repeat)),
-        TextButton.icon(onPressed: onAddRepeat, icon: const Icon(Icons.add), label: const Text('Add repeat counter')),
+          _RepeatCounter(counter: repeat, rows: rows.value, onRemove: () => onRemove(repeat), onDark: onDark),
+        TextButton.icon(
+          onPressed: onAddRepeat,
+          style: TextButton.styleFrom(foregroundColor: onDark ? PurlnoteColors.marigold : null),
+          icon: const Icon(Icons.add),
+          label: const Text('Add repeat counter'),
+        ),
       ],
     );
   }
@@ -106,11 +115,16 @@ class CompactRowCounter extends StatelessWidget {
   }
 }
 
+/// The panel behind a counter: a lighter tone on the plum tray, white on
+/// light screens.
+Color _panel(bool onDark) => onDark ? Colors.white.withValues(alpha: 0.08) : PurlnoteColors.cream;
+
 class _RowCounter extends StatelessWidget {
-  const _RowCounter({required this.rows, required this.onChanged});
+  const _RowCounter({required this.rows, required this.onChanged, required this.onDark});
 
   final int rows;
   final ValueChanged<int> onChanged;
+  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
@@ -124,23 +138,48 @@ class _RowCounter extends StatelessWidget {
       onDecrease: () => onChanged(rows - 1),
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-        decoration: BoxDecoration(color: PurlnoteColors.cream, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: _panel(onDark), borderRadius: BorderRadius.circular(14)),
         child: Row(
           children: [
-            const Expanded(child: Text('Rows', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+            Expanded(
+              child: Text(
+                onDark ? 'ROWS' : 'Rows',
+                style: onDark
+                    ? const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1, color: _lightText)
+                    : const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ),
             ExcludeSemantics(
               child: Row(
                 children: [
-                  IconButton.outlined(onPressed: () => onChanged(rows - 1), icon: const Icon(Icons.remove)),
+                  IconButton.outlined(
+                    onPressed: () => onChanged(rows - 1),
+                    color: onDark ? PurlnoteColors.cream : null,
+                    style: onDark ? IconButton.styleFrom(side: const BorderSide(color: Color(0x66FFFFFF))) : null,
+                    icon: const Icon(Icons.remove),
+                  ),
                   SizedBox(
                     width: 56,
                     child: Text(
                       '$rows',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: onDark ? PurlnoteColors.cream : null,
+                      ),
                     ),
                   ),
-                  IconButton.filled(onPressed: () => onChanged(rows + 1), icon: const Icon(Icons.add)),
+                  IconButton.filled(
+                    onPressed: () => onChanged(rows + 1),
+                    style: onDark
+                        ? IconButton.styleFrom(
+                            backgroundColor: PurlnoteColors.marigold,
+                            foregroundColor: PurlnoteColors.plum,
+                          )
+                        : null,
+                    icon: const Icon(Icons.add),
+                  ),
                 ],
               ),
             ),
@@ -151,12 +190,16 @@ class _RowCounter extends StatelessWidget {
   }
 }
 
+/// Text on the plum tray.
+const _lightText = PurlnoteColors.cream;
+
 class _RepeatCounter extends StatelessWidget {
-  const _RepeatCounter({required this.counter, required this.rows, required this.onRemove});
+  const _RepeatCounter({required this.counter, required this.rows, required this.onRemove, required this.onDark});
 
   final ProjectCounter counter;
   final int rows;
   final VoidCallback onRemove;
+  final bool onDark;
 
   @override
   Widget build(BuildContext context) {
@@ -170,19 +213,30 @@ class _RepeatCounter extends StatelessWidget {
       padding: const EdgeInsets.only(top: 6),
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 8, 4, 8),
-        decoration: BoxDecoration(color: PurlnoteColors.cream, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: _panel(onDark), borderRadius: BorderRadius.circular(14)),
         child: Row(
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(counter.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  Text('$progress · $next', style: const TextStyle(fontSize: 13, color: PurlnoteColors.plumMuted)),
+                  Text(
+                    counter.label,
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: onDark ? _lightText : null),
+                  ),
+                  Text(
+                    '$progress · $next',
+                    style: TextStyle(fontSize: 13, color: onDark ? PurlnoteColors.blush : PurlnoteColors.plumMuted),
+                  ),
                 ],
               ),
             ),
-            IconButton(tooltip: 'Remove ${counter.label}', onPressed: onRemove, icon: const Icon(Icons.close)),
+            IconButton(
+              tooltip: 'Remove ${counter.label}',
+              color: onDark ? _lightText : null,
+              onPressed: onRemove,
+              icon: const Icon(Icons.close),
+            ),
           ],
         ),
       ),
