@@ -651,22 +651,6 @@ class _SideStep extends StatelessWidget {
   }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag({required this.text, required this.color});
-
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
-      child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: PurlnoteColors.plum)),
-    );
-  }
-}
-
 class _Notice extends StatelessWidget {
   const _Notice({required this.text});
 
