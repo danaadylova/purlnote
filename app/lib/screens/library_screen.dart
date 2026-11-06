@@ -138,7 +138,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 _PatternCover(pattern: patterns[index], onTap: () => _open(patterns[index])),
                           )
                         : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            // Clear of the floating tab bar at the end.
+                            padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.paddingOf(context).bottom),
                             itemCount: patterns.length,
                             separatorBuilder: (context, index) => const Divider(height: 1),
                             itemBuilder: (context, index) =>

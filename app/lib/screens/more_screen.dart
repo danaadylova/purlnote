@@ -37,7 +37,11 @@ class MoreScreen extends StatelessWidget {
             title: Semantics(header: true, child: const Text('More')),
           ),
           body: ListView(
-            padding: readablePadding(context, const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
+            // Clear of the floating tab bar at the end.
+            padding: readablePadding(
+              context,
+              EdgeInsets.fromLTRB(16, 8, 16, 16 + MediaQuery.paddingOf(context).bottom),
+            ),
             children: [
               ListTile(
                 contentPadding: EdgeInsets.zero,

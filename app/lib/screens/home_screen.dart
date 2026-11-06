@@ -65,11 +65,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
+      // The screens run on under the floating tab bar, so the page shows
+      // around its rounded ends. Lists leave room at their end for it.
+      extendBody: true,
+      backgroundColor: Colors.transparent,
       body: DecoratedBox(decoration: const BoxDecoration(gradient: plumFade), child: pages),
-      bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(color: PurlnoteColors.cream),
-        child: _FloatingTabBar(selected: _tab, onSelected: (tab) => setState(() => _tab = tab)),
-      ),
+      bottomNavigationBar: _FloatingTabBar(selected: _tab, onSelected: (tab) => setState(() => _tab = tab)),
     );
   }
 }

@@ -160,7 +160,8 @@ class NotebookScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.only(bottom: 32),
+                    // Clear of the floating tab bar.
+            padding: EdgeInsets.only(bottom: 32 + MediaQuery.paddingOf(context).bottom),
                     children: projectSections,
                   ),
                 ),
@@ -190,7 +191,8 @@ class NotebookScreen extends StatelessWidget {
         child: RefreshIndicator(
           onRefresh: session.refresh,
           child: ListView(
-            padding: const EdgeInsets.only(bottom: 32),
+            // Clear of the floating tab bar.
+            padding: EdgeInsets.only(bottom: 32 + MediaQuery.paddingOf(context).bottom),
             children: [
               ...projectSections,
               Padding(
