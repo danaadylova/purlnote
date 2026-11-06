@@ -70,6 +70,7 @@ class MoreScreen extends StatelessWidget {
                 ),
                 const Divider(),
                 _BackupSwitch(session: session),
+                _HiddenCommentsRow(session: session),
                 const Divider(),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -118,7 +119,6 @@ class MoreScreen extends StatelessWidget {
                 subtitle: const Text('Ideas, bugs, or just hello. Goes to the person who makes Purlnote.'),
                 onTap: () => _sendFeedback(context),
               ),
-              _HiddenCommentsRow(session: session),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.privacy_tip_outlined),
