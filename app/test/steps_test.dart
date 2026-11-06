@@ -82,6 +82,42 @@ void main() {
       expect(sizeNamesFor('Cast on 31 33 35 sts.\nWork 4 6 8 rows.'), ['Size 1', 'Size 2', 'Size 3']);
     });
 
+    test('every other size in brackets, as in "XS (S) M (L) XL (2XL)"', () {
+      const pattern = '''
+SIZES
+XS (S) M (L) XL (2XL) 3XL (4XL)
+MEASUREMENTS
+Circumference: 117 (127) 138 (142) 153 (159) 167 (173) cm [46 (50) 54.25 (55.75) 60 (62.5) 65.75 (68) inches]
+''';
+      expect(sizeNamesFor(pattern), ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL']);
+      const line = 'Circumference: 117 (127) 138 (142) 153 (159) 167 (173) cm [46 (50) 54.25 (55.75) 60 (62.5) 65.75 (68) inches]';
+      expect(textForSize(line, 2, sizeCount: 8), 'Circumference: 138 cm [54.25 inches]');
+      expect(textForSize('k-B *7 (8) 9 (9) 8 (8) 9 (9), k-A 2*', 5, sizeCount: 8), 'k-B *8, k-A 2*');
+      expect(findSizeNames('Sizes: XS (S) M (L) XL\nYarn: …'), ['XS', 'S', 'M', 'L', 'XL']);
+      expect(textForSize('Cast on 80 (88) 96 (104) 112 sts.', 4, sizeCount: 5), 'Cast on 112 sts.');
+    });
+
+    test('a size list that wraps onto the next line stays one list', () {
+      const text = 'you have worked a total of 31 (33)\n37 (39) 43 (45) 47 (49) rows.';
+      expect(textForSize(text, 3, sizeCount: 8), 'you have worked a total of 39 rows.');
+      expect(textForSize('measures 13 (14) 15 (16) 18 (19) 19,5 (20) cm', 6, sizeCount: 8), 'measures 19,5 cm');
+      expect(textForSize('450 (500) 550 (550) 600 (600) 650 (650-700) g', 7, sizeCount: 8), '650-700 g');
+    });
+
+    test('letters, numbers in brackets and sizes with measurements', () {
+      final letters = findSizeNames('Size: A (B) C (D), E (F) G (H), I (J) K (L)');
+      expect(letters.join(' '), 'A B C D E F G H I J K L');
+      final numbers = findSizeNames('Sizes: 1 (2, 3, 4, 5, 6) (7, 8, 9, 10, 11)');
+      expect(numbers.join(' '), '1 2 3 4 5 6 7 8 9 10 11');
+      final measured = findSizeNames('Sizes: XXS 65, XS 76, S 84, M 95, L 101, XL 110,\n2XL 122, 3XL 132, 4XL 142 cm');
+      expect(measured.join(' '), 'XXS XS S M L XL 2XL 3XL 4XL');
+    });
+
+    test('two lists side by side are left as written rather than guessed', () {
+      expect(textForSize('K 3 (4) 5 (6) sts', 1, sizeCount: 2), 'K 3 (4) 5 (6) sts');
+      expect(textForSize('Work 3 (4) rows, then 5 (6) 8th row', 1), 'Work 4 rows, then 6 8th row');
+    });
+
     test('offers as many sizes as the numbers have, even if the names list is shorter', () {
       const text = 'Sizes: S (M)\nCast on 80 (88, 96, 104) sts.';
       expect(sizeNamesFor(text), ['S', 'M', 'Size 3', 'Size 4']);
