@@ -42,10 +42,14 @@ class CountersBar extends StatelessWidget {
 /// The row counter as a small plum pill, floating over the page when the
 /// phone is sideways: "ROW − 14 +".
 class CompactRowCounter extends StatelessWidget {
-  const CompactRowCounter({super.key, required this.rows, required this.onChanged});
+  const CompactRowCounter({super.key, required this.rows, required this.onChanged, this.minusButton = true});
 
   final int rows;
   final ValueChanged<int> onChanged;
+
+  /// Whether to show the minus button. Where space is tight, counting back
+  /// is left to the full counter.
+  final bool minusButton;
 
   @override
   Widget build(BuildContext context) {
@@ -72,12 +76,13 @@ class CompactRowCounter extends StatelessWidget {
                   style: TextStyle(color: PurlnoteColors.blush, fontSize: 11, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(width: 6),
-                IconButton(
-                  onPressed: () => onChanged(rows - 1),
-                  color: Colors.white,
-                  style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.14)),
-                  icon: const Icon(Icons.remove, size: 20),
-                ),
+                if (minusButton)
+                  IconButton(
+                    onPressed: () => onChanged(rows - 1),
+                    color: Colors.white,
+                    style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.14)),
+                    icon: const Icon(Icons.remove, size: 20),
+                  ),
                 SizedBox(
                   width: 44,
                   child: Text(

@@ -75,9 +75,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
   /// Showing the Steps view instead of the PDF page.
   ReaderView _view = ReaderView.page;
 
-  /// With the phone sideways, whether the floating controls are showing.
-  /// Tapping the page hides and shows them.
+  /// Whether the bars (or, sideways, the floating controls) are showing.
+  /// Tapping the page, or Hide, hides them; the choice is remembered for
+  /// the next pattern too.
   bool _controlsShown = true;
+
+  static const _barsHiddenSetting = 'reader_bars_hidden';
 
   @override
   void initState() {
@@ -97,6 +100,8 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final lastFileId = widget.startFileId ??
         (widget.projectId == null ? null : await _store.lastFileFor(_projectId, files));
     final file = files.where((f) => f.id == lastFileId).firstOrNull ?? files.firstOrNull;
+
+    _controlsShown = await widget.session.database.setting(_barsHiddenSetting) != 'true';
 
     final awakeSetting = await widget.session.library.awakeMinutes(widget.pattern.key);
     _awake.start(awakeSetting ?? AwakeTimer.defaultMinutes);
@@ -402,6 +407,15 @@ class _ReaderScreenState extends State<ReaderScreen> {
     setState(() => _counters = counters);
   }
 
+  void _showControls(bool shown) {
+    setState(() => _controlsShown = shown);
+    widget.session.database.saveSetting(_barsHiddenSetting, shown ? 'false' : 'true');
+  }
+
+  /// Taps on the page hide or show the bars, unless a tool is in use, so
+  /// drawing or pinning a note never hides them by accident.
+  VoidCallback? get _pageTap => _tool == ReaderTool.none ? () => _showControls(!_controlsShown) : null;
+
   Future<void> _setAwake(int minutes) async {
     await widget.session.library.setAwakeMinutes(widget.pattern.key, minutes);
     setState(() => _awake.start(minutes));
@@ -421,76 +435,139 @@ class _ReaderScreenState extends State<ReaderScreen> {
       );
     }
 
+    final view = file == null ? ReaderView.page : _shownView(context);
+    final showsPage = view != ReaderView.steps;
+    final shown = _controlsShown;
+
     return Listener(
       // Every touch keeps the screen awake a little longer.
       onPointerDown: (_) => _awake.touched(),
       child: Scaffold(
         backgroundColor: PurlnoteColors.sand,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Semantics(header: true, child: Text(widget.pattern.title, style: const TextStyle(fontSize: 16))),
-              if (file != null)
-                Text(
-                  '${file.label} · page ${_page ?? 1}',
-                  style: const TextStyle(fontSize: 12, color: PurlnoteColors.plumMuted),
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                _Collapsing(
+                  shown: shown || file == null,
+                  fromTop: true,
+                  child: _TopBar(
+                    title: widget.pattern.title,
+                    subtitle: file == null ? null : '${file.label} · page ${_page ?? 1}',
+                    view: file == null ? null : view,
+                    offerBoth: isWide(context),
+                    onView: (view) => setState(() => _view = view),
+                    awake: _AwakeMenu(minutes: _awake.minutes, onChanged: _setAwake, compact: true),
+                    noteCount: noteCount,
+                    onNotes: _showNotesList,
+                    // On the page, the tray below has its own Hide.
+                    onHide: file == null || showsPage ? null : () => _showControls(false),
+                    files: _files.length > 1 && file != null
+                        ? _FileSwitcher(files: _files, current: file, onChanged: (f) => _showFile(f))
+                        : null,
+                  ),
                 ),
-            ],
-          ),
-          actions: [
-            _AwakeMenu(minutes: _awake.minutes, onChanged: _setAwake),
-            IconButton(
-              tooltip: noteCount == 0 ? 'Notes' : '$noteCount notes',
-              onPressed: _showNotesList,
-              icon: Badge(isLabelVisible: noteCount > 0, label: Text('$noteCount'), child: const Icon(Icons.notes)),
-            ),
-          ],
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : file == null
-                ? const _NothingDownloaded()
-                : Column(
-                    children: [
-                      _ViewSwitch(
-                        view: _shownView(context),
-                        offerBoth: isWide(context),
-                        onChanged: (view) => setState(() => _view = view),
-                      ),
-                      if (_files.length > 1)
-                        _FileSwitcher(files: _files, current: file, onChanged: (f) => _showFile(f)),
-                      Expanded(
-                        child: switch (_shownView(context)) {
-                          ReaderView.page => _pageWithTools(file),
-                          ReaderView.steps => _steps(file, sideBySide: false),
-                          ReaderView.both => Row(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Expanded(flex: 5, child: _pageWithTools(file)),
-                                const VerticalDivider(width: 1, color: PurlnoteColors.line),
-                                Expanded(flex: 4, child: _steps(file, sideBySide: true)),
-                              ],
-                            ),
-                        },
-                      ),
-                      if (_counters.isNotEmpty)
-                        Container(
-                          color: Colors.white,
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                          child: SafeArea(
-                            top: false,
-                            child: CountersBar(
+                Expanded(
+                  child: SafeArea(
+                    // With the top bar hidden, keep the page clear of the
+                    // status bar.
+                    top: !shown,
+                    bottom: !showsPage,
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : file == null
+                            ? const _NothingDownloaded()
+                            : switch (view) {
+                                ReaderView.page => _pageWithTools(file),
+                                ReaderView.steps => _steps(file, sideBySide: false),
+                                ReaderView.both => Row(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(flex: 5, child: _pageWithTools(file)),
+                                      const VerticalDivider(width: 1, color: PurlnoteColors.line),
+                                      Expanded(flex: 4, child: _steps(file, sideBySide: true)),
+                                    ],
+                                  ),
+                              },
+                  ),
+                ),
+                if (file != null && showsPage)
+                  _Collapsing(
+                    shown: shown,
+                    fromTop: false,
+                    child: _ToolsTray(
+                      onHide: () => _showControls(false),
+                      ruler: _ruler?.visible == true
+                          ? RulerControls(compact: true, onMove: _moveRuler, onResize: _resizeRuler)
+                          : null,
+                      tools: _Toolbar(tool: _tool, rulerOn: _ruler?.visible == true, onTool: _chooseTool),
+                      counters: _counters.isEmpty
+                          ? null
+                          : CountersBar(
                               counters: _counters,
                               onRowsChanged: _setRows,
                               onAddRepeat: _addRepeatCounter,
                               onRemove: _removeCounter,
                             ),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
+              ],
+            ),
+            // With the bars hidden: back, a way to bring them back, and the
+            // row counter, floating over the page.
+            if (file != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: shown,
+                  child: AnimatedOpacity(
+                    opacity: shown ? 0 : 1,
+                    duration: _Collapsing.duration,
+                    child: SafeArea(
+                      minimum: const EdgeInsets.all(12),
+                      child: Stack(
+                        children: [
+                          const Positioned(left: 0, top: 0, child: _FloatingBack()),
+                          if (showsPage)
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: _FloatingPanel(
+                                child: TextButton.icon(
+                                  onPressed: () => _showControls(true),
+                                  icon: const Icon(Icons.keyboard_arrow_up),
+                                  label: const Text('Tools'),
+                                ),
+                              ),
+                            )
+                          else
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: _FloatingPanel(
+                                child: TextButton.icon(
+                                  onPressed: () => _showControls(true),
+                                  icon: const Icon(Icons.keyboard_arrow_down),
+                                  label: const Text('Show bar'),
+                                ),
+                              ),
+                            ),
+                          if (showsPage && _counters.isNotEmpty)
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: CompactRowCounter(
+                                rows: _counters.first.value,
+                                onChanged: _setRows,
+                                minusButton: false,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -566,7 +643,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
           child: GestureDetector(
             // Only while no tool is in use, so drawing and pinning notes
             // never hide the controls by accident.
-            onTap: _tool == ReaderTool.none ? () => setState(() => _controlsShown = !_controlsShown) : null,
+            onTap: _pageTap,
             child: _buildPages(file),
           ),
         ),
@@ -637,19 +714,9 @@ class _ReaderScreenState extends State<ReaderScreen> {
     return _view;
   }
 
-  /// The PDF, with the ruler controls and the drawing tools under it.
+  /// The PDF. Tapping it hides or shows the bars.
   Widget _pageWithTools(PatternFile file) {
-    return Column(
-      children: [
-        Expanded(child: _buildPages(file)),
-        if (_ruler?.visible == true) RulerControls(onMove: _moveRuler, onResize: _resizeRuler),
-        _Toolbar(
-          tool: _tool,
-          rulerOn: _ruler?.visible == true,
-          onTool: _chooseTool,
-        ),
-      ],
-    );
+    return GestureDetector(onTap: _pageTap, child: _buildPages(file));
   }
 
   /// The Steps view. Beside the page, "show on the page" turns the page
@@ -663,6 +730,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       projectId: _projectId,
       rows: _counters.isEmpty ? null : _counters.first.value,
       onRowsChanged: _counters.isEmpty ? null : _setRows,
+      showRowCounter: !sideBySide,
       onShowPage: (page) {
         if (sideBySide) {
           if (_viewer.isReady) _viewer.goToPage(pageNumber: page);
@@ -785,14 +853,34 @@ enum ReaderView { page, both, steps }
 
 /// Switches between Page, Steps and, with room for them, Both.
 class _ViewSwitch extends StatelessWidget {
-  const _ViewSwitch({required this.view, required this.offerBoth, required this.onChanged});
+  const _ViewSwitch({required this.view, required this.offerBoth, required this.onChanged, this.compact = false});
 
   final ReaderView view;
   final bool offerBoth;
   final ValueChanged<ReaderView> onChanged;
 
+  /// Words only, small enough to sit in the top bar.
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return SegmentedButton<ReaderView>(
+        showSelectedIcon: false,
+        style: const ButtonStyle(
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+        ),
+        segments: [
+          const ButtonSegment(value: ReaderView.page, label: Text('Page')),
+          if (offerBoth) const ButtonSegment(value: ReaderView.both, label: Text('Both')),
+          const ButtonSegment(value: ReaderView.steps, label: Text('Steps')),
+        ],
+        selected: {view},
+        onSelectionChanged: (selection) => onChanged(selection.first),
+      );
+    }
     return Container(
       color: Colors.white,
       width: double.infinity,
@@ -958,6 +1046,226 @@ class _ToolButton extends StatelessWidget {
   }
 }
 
+/// Slides its child away (up for a top bar, down for a bottom one) and
+/// gives the room back to the page, or slides it back in.
+class _Collapsing extends StatelessWidget {
+  const _Collapsing({required this.shown, required this.fromTop, required this.child});
+
+  final bool shown;
+  final bool fromTop;
+  final Widget child;
+
+  static const duration = Duration(milliseconds: 260);
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: AnimatedAlign(
+        duration: duration,
+        curve: Curves.easeOutCubic,
+        alignment: fromTop ? Alignment.bottomCenter : Alignment.topCenter,
+        heightFactor: shown ? 1 : 0,
+        child: AnimatedOpacity(duration: duration, opacity: shown ? 1 : 0.4, child: child),
+      ),
+    );
+  }
+}
+
+/// The reader's top bar: back, the pattern and page, Page/Steps, keep
+/// awake, notes and, in Steps, a button that hides the bar. A soft shadow sets it
+/// above the page.
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.title,
+    required this.subtitle,
+    required this.view,
+    required this.offerBoth,
+    required this.onView,
+    required this.awake,
+    required this.noteCount,
+    required this.onNotes,
+    required this.onHide,
+    required this.files,
+  });
+
+  final String title;
+  final String? subtitle;
+  final ReaderView? view;
+  final bool offerBoth;
+  final ValueChanged<ReaderView> onView;
+  final Widget awake;
+  final int noteCount;
+  final VoidCallback onNotes;
+  final VoidCallback? onHide;
+
+  /// Tabs for a pattern with several PDFs.
+  final Widget? files;
+
+  @override
+  Widget build(BuildContext context) {
+    final view = this.view;
+    return Material(
+      color: Colors.white,
+      elevation: 3,
+      shadowColor: const Color(0x553B1C34),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+              child: Row(
+                children: [
+                  const BackButton(),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        if (subtitle != null)
+                          Text(
+                            subtitle!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12, color: PurlnoteColors.plumMuted),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (view != null) _ViewSwitch(view: view, offerBoth: offerBoth, onChanged: onView, compact: true),
+                  awake,
+                  IconButton(
+                    tooltip: noteCount == 0 ? 'Notes' : '$noteCount notes',
+                    onPressed: onNotes,
+                    icon: Badge(
+                      isLabelVisible: noteCount > 0,
+                      label: Text('$noteCount'),
+                      child: const Icon(Icons.notes),
+                    ),
+                  ),
+                  if (onHide != null)
+                    IconButton(tooltip: 'Hide the bars', onPressed: onHide, icon: const Icon(Icons.fullscreen)),
+                ],
+              ),
+            ),
+            if (files != null) files!,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The tools under the page, in a tray with rounded corners and a shadow so
+/// it's clear where the page ends: the ruler arrows (while the ruler is
+/// on), the drawing tools and the counters. Hide, or a swipe down on its
+/// handle, slides it away.
+class _ToolsTray extends StatelessWidget {
+  const _ToolsTray({required this.onHide, required this.ruler, required this.tools, required this.counters});
+
+  final VoidCallback onHide;
+  final Widget? ruler;
+  final Widget tools;
+  final Widget? counters;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 8,
+      shadowColor: const Color(0x663B1C34),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragEnd: (details) {
+                  if ((details.primaryVelocity ?? 0) > 0) onHide();
+                },
+                child: SizedBox(
+                  height: 34,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 5,
+                        decoration: BoxDecoration(color: PurlnoteColors.line, borderRadius: BorderRadius.circular(3)),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: onHide,
+                          iconAlignment: IconAlignment.end,
+                          icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                          label: const Text('Hide'),
+                          style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (ruler != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+                  decoration: BoxDecoration(
+                    color: PurlnoteColors.marigold.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'RULER',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: PurlnoteColors.brown),
+                        ),
+                      ),
+                      ruler!,
+                    ],
+                  ),
+                ),
+              tools,
+              if (counters != null) counters!,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The back button floating over the page while the bars are hidden.
+class _FloatingBack extends StatelessWidget {
+  const _FloatingBack();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.95),
+      shape: const CircleBorder(),
+      elevation: 3,
+      shadowColor: const Color(0x553B1C34),
+      child: const BackButton(),
+    );
+  }
+}
+
 /// A small white panel floating over the page, for the sideways layout.
 class _FloatingPanel extends StatelessWidget {
   const _FloatingPanel({required this.child});
@@ -978,10 +1286,13 @@ class _FloatingPanel extends StatelessWidget {
 
 /// The chip that shows and changes how long the screen stays awake.
 class _AwakeMenu extends StatelessWidget {
-  const _AwakeMenu({required this.minutes, required this.onChanged});
+  const _AwakeMenu({required this.minutes, required this.onChanged, this.compact = false});
 
   final int minutes;
   final ValueChanged<int> onChanged;
+
+  /// Just the sun icon, on blush while the screen is kept awake.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -992,14 +1303,31 @@ class _AwakeMenu extends StatelessWidget {
         for (final choice in AwakeTimer.choices)
           CheckedPopupMenuItem(value: choice, checked: choice == minutes, child: Text(AwakeTimer.describe(choice))),
       ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Chip(
-          avatar: const Icon(Icons.light_mode_outlined, size: 16),
-          label: Text(minutes == AwakeTimer.off ? 'Awake off' : 'Awake · ${AwakeTimer.describe(minutes)}'),
-          backgroundColor: PurlnoteColors.blush,
-          side: BorderSide.none,
-        ),
+      child: compact ? _compactChip() : _chip(),
+    );
+  }
+
+  Widget _compactChip() {
+    return Container(
+      width: 36,
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: minutes == AwakeTimer.off ? Colors.transparent : PurlnoteColors.blush,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Icons.light_mode_outlined, size: 20),
+    );
+  }
+
+  Widget _chip() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Chip(
+        avatar: const Icon(Icons.light_mode_outlined, size: 16),
+        label: Text(minutes == AwakeTimer.off ? 'Awake off' : 'Awake · ${AwakeTimer.describe(minutes)}'),
+        backgroundColor: PurlnoteColors.blush,
+        side: BorderSide.none,
       ),
     );
   }

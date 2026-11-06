@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import '../app_session.dart';
+import '../reader/counters_bar.dart';
 import '../theme.dart';
 import 'size_text.dart';
 import 'step_models.dart';
@@ -20,6 +21,7 @@ class StepsView extends StatefulWidget {
     required this.onShowPage,
     this.rows,
     this.onRowsChanged,
+    this.showRowCounter = true,
   });
 
   final AppSession session;
@@ -35,6 +37,10 @@ class StepsView extends StatefulWidget {
   /// The project's row counter, if it has one. Next moves it on row steps.
   final int? rows;
   final ValueChanged<int>? onRowsChanged;
+
+  /// Whether to show the row counter beside Next. Off when the page is shown
+  /// beside the steps (on an iPad), since the page has its own.
+  final bool showRowCounter;
 
   @override
   State<StepsView> createState() => _StepsViewState();
@@ -350,6 +356,12 @@ class _StepsViewState extends State<StepsView> {
     String shown(PatternStep s) =>
         sizeIndex == null || _showAllSizes ? s.text : textForSize(s.text, sizeIndex, sizeCount: _sizeNames.length);
 
+    final rows = widget.rows;
+    final onRowsChanged = widget.onRowsChanged;
+
+    // The focus layout: the current step large in the middle, the steps
+    // before and after it small and faded, and Back, the row counter and
+    // Next along the bottom.
     return Column(
       children: [
         _StepsHeader(
@@ -368,66 +380,94 @@ class _StepsViewState extends State<StepsView> {
           onJump: _jumpTo,
           onChooseStart: () => _chooseStart(),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: (index + 1) / visible.length,
+              minHeight: 6,
+              backgroundColor: PurlnoteColors.line,
+              color: PurlnoteColors.marigold,
+              semanticsLabel: 'Progress through the steps',
+            ),
+          ),
+        ),
         if (basic) const _Notice(text: 'Basic steps on this iPhone. Some may be split oddly; press and hold a step to fix it.'),
         if (_pagesWithoutText.isNotEmpty)
           _Notice(text: 'No text to read on page ${_pagesWithoutText.join(', ')}. Check those pages in the PDF.'),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            children: [
-              if (index == 0 && _skipped.isNotEmpty)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: _showPatternInfo,
-                    icon: const Icon(Icons.info_outline),
-                    label: Text('Pattern info (${_skipped.length} parts before the start)'),
-                  ),
-                ),
-              if (previous != null)
-                _SideStep(heading: previous.heading, text: shown(previous), dashed: false),
-              const SizedBox(height: 10),
-              GestureDetector(
-                onLongPress: () => _fix(step, next),
-                child: _CurrentStep(
-                  step: step,
-                  text: shown(step),
-                  showingAllSizes: _showAllSizes || sizeIndex == null,
-                  canToggleSizes: sizeIndex != null && hasSizeGroup(step.text, sizeCount: _sizeNames.length),
-                  onToggleSizes: () => setState(() => _showAllSizes = !_showAllSizes),
-                  onShowPage: () => widget.onShowPage(step.sourcePage),
-                  onFix: () => _fix(step, next),
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: ConstrainedBox(
+                // Centred when it fits; scrolls when a step is very long.
+                constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (index == 0 && _skipped.isNotEmpty)
+                      TextButton.icon(
+                        onPressed: _showPatternInfo,
+                        icon: const Icon(Icons.info_outline),
+                        label: Text('Pattern info (${_skipped.length} parts before the start)'),
+                      ),
+                    if (previous != null) _SideStep(heading: previous.heading, text: shown(previous)),
+                    const SizedBox(height: 22),
+                    GestureDetector(
+                      onLongPress: () => _fix(step, next),
+                      child: _CurrentStep(
+                        step: step,
+                        text: shown(step),
+                        showingAllSizes: _showAllSizes || sizeIndex == null,
+                        canToggleSizes: sizeIndex != null && hasSizeGroup(step.text, sizeCount: _sizeNames.length),
+                        onToggleSizes: () => setState(() => _showAllSizes = !_showAllSizes),
+                        onShowPage: () => widget.onShowPage(step.sourcePage),
+                        onFix: () => _fix(step, next),
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    if (next != null) _SideStep(heading: 'Next · ${next.heading}', text: shown(next)),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              if (next != null) _SideStep(heading: 'Next · ${next.heading}', text: shown(next), dashed: true),
-            ],
+            ),
           ),
         ),
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: index == 0 ? null : () => _move(-1),
-                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-                  icon: const Icon(Icons.chevron_left),
-                  label: const Text('Back', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Row(
+              children: [
+                SizedBox.square(
+                  dimension: 56,
+                  child: OutlinedButton(
+                    onPressed: index == 0 ? null : () => _move(-1),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Icon(Icons.chevron_left, semanticLabel: 'Back'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: next == null ? null : () => _move(1),
-                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-                  icon: const Icon(Icons.chevron_right),
-                  label: Text(next == null ? 'Last step' : 'Next'),
+                if (widget.showRowCounter && rows != null && onRowsChanged != null) ...[
+                  const SizedBox(width: 10),
+                  CompactRowCounter(rows: rows, onChanged: onRowsChanged, minusButton: false),
+                ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: next == null ? null : () => _move(1),
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+                    iconAlignment: IconAlignment.end,
+                    icon: const Icon(Icons.chevron_right),
+                    label: Text(next == null ? 'Last step' : 'Next'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -517,6 +557,8 @@ class _StepsHeader extends StatelessWidget {
   }
 }
 
+/// The step to work now, large and centred so it can be read from arm's
+/// length.
 class _CurrentStep extends StatelessWidget {
   const _CurrentStep({
     required this.step,
@@ -538,78 +580,73 @@ class _CurrentStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final repeat = step.repeatIndex == null ? null : 'Repeat ${step.repeatIndex} of ${step.repeatTotal}';
+    final details = [
+      step.heading,
+      if (step.repeatIndex != null) 'Repeat ${step.repeatIndex} of ${step.repeatTotal}',
+      if (step.madeBy == StepMaker.edited) 'Fixed by you',
+    ].join(' · ');
     return Semantics(
       label: 'Current step',
       customSemanticsActions: {const CustomSemanticsAction(label: 'Fix this step'): onFix},
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: PurlnoteColors.moss, width: 2),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    step.heading,
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: PurlnoteColors.mossDark),
-                  ),
+      child: Column(
+        children: [
+          Text(
+            details.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+              color: PurlnoteColors.mossDark,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 29, height: 1.3, fontWeight: FontWeight.w600, color: PurlnoteColors.plum),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 4,
+            children: [
+              if (canToggleSizes)
+                TextButton(
+                  onPressed: onToggleSizes,
+                  child: Text(showingAllSizes ? 'Show only my size' : 'Show every size'),
                 ),
-                if (repeat != null) _Tag(text: repeat, color: PurlnoteColors.blush),
-                const SizedBox(width: 6),
-                _Tag(text: step.madeBy == StepMaker.edited ? 'Fixed by you' : 'Made by Purlnote', color: PurlnoteColors.sand),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(text, style: const TextStyle(fontSize: 22, height: 1.35, fontWeight: FontWeight.w600)),
-            if (canToggleSizes)
-              TextButton(
-                onPressed: onToggleSizes,
-                child: Text(showingAllSizes ? 'Show only my size' : 'Show every size'),
+              TextButton.icon(
+                onPressed: onShowPage,
+                icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: Text('Page ${step.sourcePage}'),
               ),
-            const SizedBox(height: 4),
-            OutlinedButton.icon(
-              onPressed: onShowPage,
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              label: Text('From page ${step.sourcePage} · see the original'),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
+/// The step before or after the current one: small and faded, for context.
 class _SideStep extends StatelessWidget {
-  const _SideStep({required this.heading, required this.text, required this.dashed});
+  const _SideStep({required this.heading, required this.text});
 
   final String heading;
   final String text;
-  final bool dashed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: dashed ? Colors.transparent : PurlnoteColors.sand,
-        border: dashed ? Border.all(color: PurlnoteColors.inputBorder) : null,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text.rich(
-        TextSpan(children: [
-          TextSpan(text: '$heading · ', style: const TextStyle(fontWeight: FontWeight.w700)),
-          TextSpan(text: text),
-        ]),
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 14, color: PurlnoteColors.plumMuted),
-      ),
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(text: '$heading · ', style: const TextStyle(fontWeight: FontWeight.w700)),
+        TextSpan(text: text),
+      ]),
+      textAlign: TextAlign.center,
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 15, height: 1.35, color: Color(0xFFA8949F)),
     );
   }
 }
