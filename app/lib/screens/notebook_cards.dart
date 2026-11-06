@@ -132,10 +132,6 @@ class _OnTheNeedlesCarouselState extends State<OnTheNeedlesCarousel> {
   }
 }
 
-/// What a card needs beyond the project record: the pattern PDF, if it's on
-/// the phone, and the project's counters.
-typedef _CardDetails = ({LibraryPattern? pattern, List<ProjectCounter> counters});
-
 class _NeedlesCard extends StatefulWidget {
   const _NeedlesCard({required this.session, required this.project, required this.onOpen, required this.onArrange});
 
@@ -149,23 +145,19 @@ class _NeedlesCard extends StatefulWidget {
 }
 
 class _NeedlesCardState extends State<_NeedlesCard> {
-  late Future<_CardDetails> _details = _load();
+  /// The project's pattern, if its PDF is on this device. Loaded once the
+  /// card shows, so the button can say "Open pattern" or "Continue knitting".
+  late Future<LibraryPattern?> _pattern = _load();
 
-  Future<_CardDetails> _load() async {
+  Future<LibraryPattern?> _load() async {
     final pattern = await widget.session.patternForProject(widget.project);
-    final all = await widget.session.reader.existingCountersFor(widget.project.id);
-    // The row counter, then repeat counters.
-    final counters = [
-      ...all.where((counter) => !counter.isRepeat).take(1),
-      ...all.where((counter) => counter.isRepeat),
-    ];
-    return (pattern: pattern != null && pattern.isOnPhone ? pattern : null, counters: counters);
+    return pattern != null && pattern.isOnPhone ? pattern : null;
   }
 
   @override
   void didUpdateWidget(_NeedlesCard old) {
     super.didUpdateWidget(old);
-    if (old.project != widget.project) _details = _load();
+    if (old.project != widget.project) _pattern = _load();
   }
 
   /// With the pattern's PDF on the phone, opens it where the knitter left
@@ -178,8 +170,8 @@ class _NeedlesCardState extends State<_NeedlesCard> {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => ReaderScreen(session: widget.session, pattern: pattern, projectId: widget.project.id),
     ));
-    // Counters may have moved while reading.
-    if (mounted) setState(() => _details = _load());
+    // The PDF may have been added or removed meanwhile.
+    if (mounted) setState(() => _pattern = _load());
   }
 
   @override
@@ -193,10 +185,11 @@ class _NeedlesCardState extends State<_NeedlesCard> {
       child: InkWell(
         onTap: widget.onOpen,
         onLongPress: widget.onArrange,
-        child: FutureBuilder<_CardDetails>(
-          future: _details,
+        child: FutureBuilder<LibraryPattern?>(
+          future: _pattern,
           builder: (context, snapshot) {
-            final details = snapshot.data;
+            final loaded = snapshot.connectionState == ConnectionState.done;
+            final pattern = snapshot.data;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -246,27 +239,16 @@ class _NeedlesCardState extends State<_NeedlesCard> {
                           if (project.progressPercent != null) _ProgressRing(percent: project.progressPercent!),
                         ],
                       ),
-                      if (details != null && details.counters.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            for (final (i, counter) in details.counters.take(3).indexed) ...[
-                              if (i > 0) const SizedBox(width: 8),
-                              Expanded(child: _CounterTile(counter: counter)),
-                            ],
-                          ],
-                        ),
-                      ],
                       const SizedBox(height: 14),
                       FilledButton(
-                        onPressed: details == null ? null : () => _continue(details.pattern),
+                        onPressed: loaded ? () => _continue(pattern) : null,
                         style: FilledButton.styleFrom(
                           backgroundColor: PurlnoteColors.marigold,
                           foregroundColor: PurlnoteColors.plum,
                           minimumSize: const Size.fromHeight(50),
                           textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                         ),
-                        child: Text(details?.pattern != null ? 'Open pattern' : 'Continue knitting'),
+                        child: Text(pattern != null ? 'Open pattern' : 'Continue knitting'),
                       ),
                     ],
                   ),
@@ -332,38 +314,6 @@ class _ProgressRing extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// One counter's name and value, such as "ROW 31" or "REPEAT 3 / 8".
-class _CounterTile extends StatelessWidget {
-  const _CounterTile({required this.counter});
-
-  final ProjectCounter counter;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = counter.totalRepeats;
-    final value = total == null ? '${counter.value}' : '${counter.value} / $total';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            counter.label.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: PurlnoteColors.blush, fontSize: 11, fontWeight: FontWeight.w700),
-          ),
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
-        ],
       ),
     );
   }

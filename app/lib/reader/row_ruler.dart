@@ -76,104 +76,72 @@ class RulerPosition {
   }
 }
 
-/// The ruler drawn on one page: the band, and the rest of the page dimmed so
-/// the current row stands out. Pages other than the ruler's are dimmed
-/// whole. Button moves are animated, so the eye can follow them.
+/// The ruler drawn on one page: a marigold band across the row, with the
+/// pattern left fully readable around it. Button moves are animated, so the
+/// eye can follow them.
 ///
-/// Press and hold the band to pick it up, then drag it to another row; it
-/// follows the finger exactly and is put down where it's let go. Short
-/// touches and swipes on the band still scroll the page as usual.
-class RulerOverlay extends StatefulWidget {
-  const RulerOverlay({super.key, required this.ruler, required this.page, required this.onDragged, required this.onDropped});
+/// Press and hold the band to pick it up, then drag it to another row, on
+/// this page or the next. The reader follows the finger from there (see
+/// [onPickedUp]), since the drag can leave this page. Short touches and
+/// swipes on the band still scroll the page as usual.
+class RulerOverlay extends StatelessWidget {
+  const RulerOverlay({
+    super.key,
+    required this.ruler,
+    required this.page,
+    required this.dragging,
+    required this.onPickedUp,
+  });
 
   final RulerPosition ruler;
   final int page;
 
-  /// While dragging: the band's new top, as a fraction of the page height.
-  final ValueChanged<double> onDragged;
+  /// Whether the ruler is being dragged: drawn bolder, and moved without
+  /// animation so it stays under the finger.
+  final bool dragging;
 
-  /// When let go, so the position can be saved.
-  final VoidCallback onDropped;
+  /// Called when the band is picked up, with how far below the band's top
+  /// edge the finger is, in pixels.
+  final ValueChanged<double> onPickedUp;
 
-  @override
-  State<RulerOverlay> createState() => _RulerOverlayState();
-}
-
-class _RulerOverlayState extends State<RulerOverlay> {
-  static const _dim = Color(0x8CFFF8EE);
   static const _duration = Duration(milliseconds: 220);
 
-  bool _dragging = false;
-  double _topWhenPickedUp = 0;
+  /// How far the touch area reaches past the band, so a thin ruler is still
+  /// easy to pick up.
+  static const _grabMargin = 12.0;
 
   @override
   Widget build(BuildContext context) {
-    final ruler = widget.ruler;
-    if (widget.page != ruler.page) {
-      return const IgnorePointer(child: ColoredBox(color: _dim, child: SizedBox.expand()));
-    }
+    if (page != ruler.page) return const SizedBox.shrink();
     return LayoutBuilder(
       builder: (context, constraints) {
         final pageHeight = constraints.maxHeight;
         final top = ruler.top * pageHeight;
         final band = ruler.height * pageHeight;
-        // While dragging, the band follows the finger with no delay.
-        final duration = _dragging ? Duration.zero : _duration;
         return Stack(
           children: [
             AnimatedPositioned(
-              duration: duration,
+              duration: dragging ? Duration.zero : _duration,
               curve: Curves.easeOut,
-              top: 0,
+              top: top - _grabMargin,
               left: 0,
               right: 0,
-              height: top,
-              child: const IgnorePointer(child: ColoredBox(color: _dim)),
-            ),
-            AnimatedPositioned(
-              duration: duration,
-              curve: Curves.easeOut,
-              top: top + band,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: const IgnorePointer(child: ColoredBox(color: _dim)),
-            ),
-            AnimatedPositioned(
-              duration: duration,
-              curve: Curves.easeOut,
-              // The touch area reaches a little past the band, so a thin
-              // ruler is still easy to pick up.
-              top: top - 12,
-              left: 0,
-              right: 0,
-              height: band + 24,
+              height: band + _grabMargin * 2,
               child: Semantics(
                 label: 'Row ruler. Press and hold, then drag to move it.',
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onLongPressStart: (_) {
+                  onLongPressStart: (details) {
                     HapticFeedback.mediumImpact();
-                    setState(() {
-                      _dragging = true;
-                      _topWhenPickedUp = ruler.top;
-                    });
-                  },
-                  onLongPressMoveUpdate: (details) {
-                    final moved = _topWhenPickedUp + details.offsetFromOrigin.dy / pageHeight;
-                    widget.onDragged(moved.clamp(0.0, 1 - ruler.height));
-                  },
-                  onLongPressEnd: (_) {
-                    setState(() => _dragging = false);
-                    widget.onDropped();
+                    onPickedUp(details.localPosition.dy - _grabMargin);
                   },
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: _grabMargin),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: PurlnoteColors.marigold.withValues(alpha: _dragging ? 0.25 : 0.12),
+                        color: PurlnoteColors.marigold.withValues(alpha: dragging ? 0.22 : 0.1),
                         border: Border.symmetric(
-                          horizontal: BorderSide(color: PurlnoteColors.marigoldDark, width: _dragging ? 3 : 2),
+                          horizontal: BorderSide(color: PurlnoteColors.marigoldDark, width: dragging ? 3 : 2),
                         ),
                       ),
                     ),

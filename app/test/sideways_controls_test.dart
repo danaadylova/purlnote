@@ -17,6 +17,48 @@ void main() {
     expect(rows, 13);
   });
 
+  testWidgets('the ruler is just a band: the rest of the page is not dimmed', (tester) async {
+    double? grabbed;
+    await tester.pumpWidget(
+      floating(
+        SizedBox(
+          width: 300,
+          height: 400,
+          child: RulerOverlay(
+            ruler: const RulerPosition(page: 1, top: 0.5, height: 0.05, visible: true),
+            page: 1,
+            dragging: false,
+            onPickedUp: (grab) => grabbed = grab,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(ColoredBox), findsNothing);
+
+    // Press and hold the band to pick it up; the reader takes over the drag.
+    await tester.longPressAt(const Offset(400, 300 + 10));
+    expect(grabbed, isNotNull);
+  });
+
+  testWidgets('pages without the ruler show nothing over them', (tester) async {
+    await tester.pumpWidget(
+      floating(
+        SizedBox(
+          width: 300,
+          height: 400,
+          child: RulerOverlay(
+            ruler: const RulerPosition(page: 2, top: 0.5, height: 0.05, visible: true),
+            page: 1,
+            dragging: false,
+            onPickedUp: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(find.byType(Container), findsNothing);
+  });
+
   testWidgets('the compact ruler controls are just the buttons', (tester) async {
     final moves = <int>[];
     final sizes = <int>[];

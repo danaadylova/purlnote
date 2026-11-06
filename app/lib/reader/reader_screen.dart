@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import '../app_session.dart';
@@ -61,6 +62,14 @@ class _ReaderScreenState extends State<ReaderScreen> {
   ReaderTool _tool = ReaderTool.none;
   /// The row ruler, if it has been used in this file.
   RulerPosition? _ruler;
+
+  /// While the ruler is being dragged: how far below the band's top edge the
+  /// finger is, in pixels. Null when it isn't being dragged.
+  double? _rulerGrab;
+
+  /// One key per page on screen, to find where each page is while the ruler
+  /// is dragged from one page to another.
+  final _pageKeys = <int, GlobalKey>{};
   bool _loading = true;
 
   /// Showing the Steps view instead of the PDF page.
@@ -105,6 +114,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final savedPage = page ?? await _store.savedPage(file.id, projectId: _projectId);
     final marks = await _store.annotationsFor(file.sha256!);
     final ruler = await _store.savedRuler(file.id, projectId: _projectId);
+    _pageKeys.clear();
     setState(() {
       _file = file;
       _startPage = savedPage ?? 1;
@@ -667,7 +677,60 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  /// Moves the dragged ruler under the finger at [globalY], onto whichever
+  /// page is there. Between two pages, it goes to the nearer one.
+  void _dragRulerTo(double globalY) {
+    final ruler = _ruler;
+    final grab = _rulerGrab;
+    if (ruler == null || grab == null) return;
+    final bandTop = globalY - grab;
+    int? bestPage;
+    var bestTop = 0.0;
+    var bestHeight = 1.0;
+    var bestDistance = double.infinity;
+    for (final entry in _pageKeys.entries) {
+      final box = entry.value.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.attached || !box.hasSize) continue;
+      final top = box.localToGlobal(Offset.zero).dy;
+      final height = box.size.height;
+      final distance = bandTop < top
+          ? top - bandTop
+          : bandTop > top + height
+              ? bandTop - top - height
+              : 0.0;
+      if (distance < bestDistance) {
+        bestPage = entry.key;
+        bestTop = top;
+        bestHeight = height;
+        bestDistance = distance;
+      }
+    }
+    if (bestPage == null) return;
+    final fraction = ((bandTop - bestTop) / bestHeight).clamp(0.0, 1 - ruler.height);
+    if (bestPage != ruler.page) HapticFeedback.selectionClick();
+    setState(() => _ruler = ruler.copyWith(page: bestPage, top: fraction));
+  }
+
+  void _dropRuler() {
+    if (_rulerGrab == null) return;
+    setState(() => _rulerGrab = null);
+    _saveRuler(_ruler!);
+  }
+
   Widget _buildPages(PatternFile file) {
+    // The drag is followed here, above the pages, because it can carry the
+    // ruler off the page where it started.
+    return Listener(
+      onPointerMove: (event) {
+        if (_rulerGrab != null) _dragRulerTo(event.position.dy);
+      },
+      onPointerUp: (_) => _dropRuler(),
+      onPointerCancel: (_) => _dropRuler(),
+      child: _pages(file),
+    );
+  }
+
+  Widget _pages(PatternFile file) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Stack(
@@ -686,12 +749,16 @@ class _ReaderScreenState extends State<ReaderScreen> {
                 scaleEnabled: !_tool.drawsOnPage,
                 onPageChanged: _pageChanged,
                 pageOverlaysBuilder: (context, pageRect, page) => [
+                  // Marks where this page is on screen, for dragging the ruler.
+                  IgnorePointer(
+                    child: SizedBox.expand(key: _pageKeys.putIfAbsent(page.pageNumber, GlobalKey.new)),
+                  ),
                   if (_ruler?.visible == true)
                     RulerOverlay(
                       ruler: _ruler!,
                       page: page.pageNumber,
-                      onDragged: (top) => setState(() => _ruler = _ruler!.copyWith(top: top)),
-                      onDropped: () => _saveRuler(_ruler!),
+                      dragging: _rulerGrab != null,
+                      onPickedUp: (grab) => setState(() => _rulerGrab = grab),
                     ),
                   PageMarks(
                     page: page.pageNumber,
