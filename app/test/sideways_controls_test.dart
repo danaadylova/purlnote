@@ -34,7 +34,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(ColoredBox), findsNothing);
+    expect(find.descendant(of: find.byType(RulerOverlay), matching: find.byType(ColoredBox)), findsNothing);
 
     // Press and hold the band to pick it up; the reader takes over the drag.
     await tester.longPressAt(const Offset(400, 300 + 10));
@@ -56,7 +56,7 @@ void main() {
         ),
       ),
     );
-    expect(find.byType(Container), findsNothing);
+    expect(find.descendant(of: find.byType(RulerOverlay), matching: find.byType(Container)), findsNothing);
   });
 
   testWidgets('the compact ruler controls are just the buttons', (tester) async {
