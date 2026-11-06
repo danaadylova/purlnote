@@ -16,8 +16,9 @@ const feedbackEmail = 'unraveled.makes@gmail.com';
 const privacyPolicyUrl = 'https://danaadylova.github.io/purlnote/privacy.html';
 const supportUrl = 'https://danaadylova.github.io/purlnote/support.html';
 
-/// Everything that isn't the Notebook or Library: sending feedback, the
-/// Ravelry account and backup, the tour, and signing out.
+/// Everything that isn't the Notebook or Library: first the Ravelry account
+/// and sync (or connecting one), then the tour, then feedback, privacy and
+/// help.
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key, required this.session});
 
@@ -43,14 +44,6 @@ class MoreScreen extends StatelessWidget {
               EdgeInsets.fromLTRB(16, 8, 16, 16 + MediaQuery.paddingOf(context).bottom),
             ),
             children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.mail_outline),
-                title: const Text('Send feedback'),
-                subtitle: const Text('Ideas, bugs, or just hello. Goes to the person who makes Purlnote.'),
-                onTap: () => _sendFeedback(context),
-              ),
-              const Divider(),
               if (session.connected) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -116,6 +109,14 @@ class MoreScreen extends StatelessWidget {
                     builder: (tour) => TutorialScreen(doneLabel: 'Done', onDone: () => Navigator.of(tour).pop()),
                   ),
                 ),
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.mail_outline),
+                title: const Text('Send feedback'),
+                subtitle: const Text('Ideas, bugs, or just hello. Goes to the person who makes Purlnote.'),
+                onTap: () => _sendFeedback(context),
               ),
               _HiddenCommentsRow(session: session),
               ListTile(
