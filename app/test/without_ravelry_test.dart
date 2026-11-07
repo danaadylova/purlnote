@@ -60,7 +60,7 @@ void main() {
       expect(nextLaunch.onTheNeedles.map((project) => project.name), ['Mitts', 'Shawl', 'Hat', 'Socks']);
     });
 
-    test('first launch: the tour, then Welcome; after "start on this phone" it opens straight to the app', () async {
+    test('first launch: the tour, then Welcome; after "start on this device" it opens straight to the app', () async {
       final session = phoneOnlySession();
       await session.start();
       expect(session.stage, AppStage.tutorial);
@@ -77,7 +77,7 @@ void main() {
       expect(network, isEmpty, reason: 'nothing leaves the phone without an account');
     });
 
-    test('projects are kept and edited on the phone, never sent anywhere', () async {
+    test('projects are kept and edited on this device, never sent anywhere', () async {
       final session = phoneOnlySession();
       await session.startWithoutRavelry();
 
@@ -104,13 +104,13 @@ void main() {
       expect(session.projectStatuses.map((s) => s.name), LocalProjects.statusNames);
     });
 
-    testWidgets('the welcome screen offers starting on the phone first', (tester) async {
+    testWidgets('the welcome screen offers starting on this device first', (tester) async {
       late AppSession session;
       await tester.runAsync(() async => session = phoneOnlySession());
       useScreenSize(tester, const Size(430, 1400));
       await tester.pumpWidget(MaterialApp(theme: buildPurlnoteTheme(), home: WelcomeScreen(session: session)));
 
-      final start = tester.getTopLeft(find.text('Start on this phone'));
+      final start = tester.getTopLeft(find.text('Start on this device'));
       final signIn = tester.getTopLeft(find.text('Sign in with Ravelry'));
       expect(start.dy, lessThan(signIn.dy));
     });

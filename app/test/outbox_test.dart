@@ -39,7 +39,7 @@ void main() {
   Future<Map<String, dynamic>?> storedProject(int id) => database.record(RecordType.project, id);
 
   group('saving an edit', () {
-    test('shows on the phone at once and waits to be sent', () async {
+    test('shows on this device at once and waits to be sent', () async {
       await outbox().saveEdit(type: RecordType.project, ravelryId: 10, changes: {'progress': 55});
 
       expect((await storedProject(10))!['progress'], 55);

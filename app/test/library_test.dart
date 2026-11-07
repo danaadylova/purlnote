@@ -99,7 +99,7 @@ void main() {
     expect(File(charts.localPath!).readAsBytesSync().take(4), '%PDF'.codeUnits);
 
     await files.download(charts);
-    expect(downloads, hasLength(1), reason: 'a file already on the phone uses no download link');
+    expect(downloads, hasLength(1), reason: 'a file already on this device uses no download link');
 
     // Listing again keeps the download.
     final again = await files.loadPurchaseFiles(70);

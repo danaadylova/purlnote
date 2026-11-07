@@ -40,7 +40,7 @@ class _EditConflictScreenState extends State<EditConflictScreen> {
         padding: readablePadding(context, const EdgeInsets.fromLTRB(16, 8, 16, 32)),
         children: [
           const Text(
-            'You changed these on this phone, and they were also changed on Ravelry. '
+            'You changed these on this device, and they were also changed on Ravelry. '
             'Pick a version for each.',
             style: TextStyle(fontSize: 16, height: 1.4),
           ),
@@ -98,7 +98,7 @@ class _FieldChoice extends StatelessWidget {
             onChanged: (value) => onChanged(value ?? choice),
             child: Column(
               children: [
-                _option(ConflictChoice.mine, 'On this phone', mine),
+                _option(ConflictChoice.mine, 'On this device', mine),
                 _option(ConflictChoice.theirs, 'On Ravelry', theirs),
                 if (allowBoth) _option(ConflictChoice.both, 'Keep both', 'Ravelry\'s text, then yours'),
               ],

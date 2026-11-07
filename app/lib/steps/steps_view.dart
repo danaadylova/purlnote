@@ -393,7 +393,7 @@ class _StepsViewState extends State<StepsView> {
             ),
           ),
         ),
-        if (basic) const _Notice(text: 'Basic steps on this iPhone. Some may be split oddly; press and hold a step to fix it.'),
+        if (basic) const _Notice(text: 'Basic steps on this device. Some may be split oddly; press and hold a step to fix it.'),
         if (_pagesWithoutText.isNotEmpty)
           _Notice(text: 'No text to read on page ${_pagesWithoutText.join(', ')}. Check those pages in the PDF.'),
         Expanded(
@@ -689,7 +689,7 @@ class _SizePicker extends StatelessWidget {
             const SizedBox(height: 8),
             const Text(
               'Steps show only your numbers, so "cast on 88 (96, 104)" reads "cast on 96". '
-              'Purlnote makes these steps from the PDF on this phone and can misread a pattern, '
+              'Purlnote makes these steps from the PDF on this device and can misread a pattern, '
               'so check a step against the page when something looks off.',
               style: TextStyle(height: 1.4),
             ),

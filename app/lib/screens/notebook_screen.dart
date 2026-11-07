@@ -477,7 +477,7 @@ class _LastUpdated extends StatelessWidget {
   Widget build(BuildContext context) {
     final String message;
     if (!session.connected) {
-      message = 'Everything here is kept on this phone.';
+      message = 'Everything here is kept on this device.';
     } else if (session.isSyncing) {
       message = 'Updating from Ravelry…';
     } else if (session.lastSyncedAt == null) {

@@ -1495,7 +1495,7 @@ class _NothingDownloaded extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(24),
         child: Text(
-          'None of this pattern\'s PDFs are on this phone yet. Download them from the Library.',
+          'None of this pattern\'s PDFs are on this device yet. Download them from the Library.',
           textAlign: TextAlign.center,
         ),
       ),

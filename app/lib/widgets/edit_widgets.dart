@@ -72,7 +72,7 @@ class PendingEditNotice extends StatelessWidget {
     final (icon, message, color) = switch (edit.state) {
       PendingEditState.waiting => (
           Icons.schedule,
-          'Changes saved on this phone. Waiting to send to Ravelry.',
+          'Changes saved on this device. Waiting to send to Ravelry.',
           PurlnoteColors.sand,
         ),
       PendingEditState.conflict => (

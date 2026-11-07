@@ -5,7 +5,7 @@ import '../theme.dart';
 /// Where a note on the pattern goes.
 enum NoteDestination {
   /// Only on the page, on this phone.
-  pageOnly('Keep on the page only', 'Only you see it, on this phone.'),
+  pageOnly('Keep on the page only', 'Only you see it, on this device.'),
 
   /// Posted as a comment on the project. Public.
   projectComment('Project comment', 'Posted on the project. Anyone who can see the project can read it.'),

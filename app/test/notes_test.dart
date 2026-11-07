@@ -47,7 +47,7 @@ void main() {
 
     setUp(() => comments = ProjectComments(ravelry: client, database: database, clock: () => testNow));
 
-    test('a note waits on the phone, then posts once', () async {
+    test('a note waits on this device, then posts once', () async {
       await comments.queue(projectId: 10, body: '[p.2] Switched to 3.75 mm', annotationId: 1);
       expect((await comments.unsent(10)).single.state, CommentState.waiting);
       expect(ravelry.commentsPosted, 0);

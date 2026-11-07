@@ -196,7 +196,7 @@ String _patternDetails(LibraryPattern pattern) {
   final where = pattern.source == PatternSource.imported
       ? 'Imported'
       : pattern.isOnPhone
-          ? 'On this phone'
+          ? 'On this device'
           : 'On Ravelry';
   return [pattern.author, where].whereType<String>().join(' · ');
 }
@@ -290,7 +290,7 @@ class _EmptyLibrary extends StatelessWidget {
             Text(
               searching
                   ? 'No patterns match that search.'
-                  : 'Bring in your pattern PDFs from Files, from iCloud Drive, a download or anywhere else on this phone. '
+                  : 'Bring in your pattern PDFs from Files, from iCloud Drive, a download or anywhere else on this device. '
                       'Patterns bought on Ravelry show up here too when a Ravelry account is connected.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),

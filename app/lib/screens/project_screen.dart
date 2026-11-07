@@ -69,7 +69,7 @@ class _StatusChips extends StatelessWidget {
       spacing: 8,
       children: [
         if (status != null) StatusChip(status: status),
-        if (project.isOnPhoneOnly) const StatusChip(status: 'On this phone'),
+        if (project.isOnPhoneOnly) const StatusChip(status: 'On this device'),
       ],
     );
   }
@@ -93,7 +93,8 @@ class _ProjectDetails extends StatelessWidget {
       body = _wideLayout(context);
     } else {
       body = ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        // A readable column in the middle of a tablet held upright.
+        padding: readablePadding(context, const EdgeInsets.fromLTRB(16, 0, 16, 32)),
         children: [
           ..._notices(context, pendingEdit),
           _PhotoStrip(session: session, project: project),
@@ -318,7 +319,7 @@ class _OpenPatternButton extends StatelessWidget {
         child: onPhone.isEmpty
             ? const Padding(
                 padding: EdgeInsets.all(24),
-                child: Text('No patterns on this phone yet. Download or import one in Library first.'),
+                child: Text('No patterns on this device yet. Download or import one in Library first.'),
               )
             : ListView(
                 shrinkWrap: true,
@@ -374,7 +375,7 @@ class _CommentsSectionState extends State<_CommentsSection> {
     if (!mounted) return;
     if (pattern == null || !pattern.isOnPhone) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('The pattern PDF isn\'t on this phone yet.')),
+        const SnackBar(content: Text('The pattern PDF isn\'t on this device yet.')),
       );
       return;
     }
@@ -658,7 +659,7 @@ class _PhotoStrip extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete this photo?'),
-        content: Text(project.isOnPhoneOnly ? 'It\'s removed from this phone.' : 'It\'s removed from the project on Ravelry.'),
+        content: Text(project.isOnPhoneOnly ? 'It\'s removed from this device.' : 'It\'s removed from the project on Ravelry.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),

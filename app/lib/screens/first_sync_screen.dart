@@ -35,7 +35,7 @@ class FirstSyncScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Copying your Ravelry records to this phone so they work offline.',
+                'Copying your Ravelry records to this device so they work offline.',
                 style: text.bodyLarge?.copyWith(color: PurlnoteColors.plumMuted),
               ),
               const SizedBox(height: 32),

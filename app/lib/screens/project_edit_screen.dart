@@ -122,7 +122,7 @@ class _ProjectEditScreenState extends State<ProjectEditScreen> {
           ),
           const SizedBox(height: 24),
           const Text(
-            'Changes save on this phone right away and go to Ravelry when you\'re online.',
+            'Changes save on this device right away and go to Ravelry when you\'re online.',
             style: TextStyle(color: PurlnoteColors.plumMuted),
           ),
         ],

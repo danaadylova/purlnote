@@ -32,7 +32,7 @@ void main() {
     });
   });
 
-  group('on a project kept on the phone', () {
+  group('on a project kept on this device', () {
     late LocalDatabase database;
     late AppSession session;
 
@@ -65,7 +65,7 @@ void main() {
       expect(entries, ['Cast on 60 instead.']);
     });
 
-    test('photos are kept on the phone and can be deleted', () async {
+    test('photos are kept on this device and can be deleted', () async {
       final folder = Directory.systemTemp.createTempSync('purlnote_photos_');
       final photos = ProjectPhotos(
         ravelry: RavelryClient(baseUrl: testConfig.ravelryApiUrl, auth: session.auth),

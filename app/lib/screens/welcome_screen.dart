@@ -56,7 +56,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             const SizedBox(height: 32),
             const _Point(icon: Icons.picture_as_pdf_outlined, text: 'Bring in pattern PDFs from Files'),
             const _Point(icon: Icons.format_list_numbered, text: 'Follow a pattern step by step, with counters'),
-            const _Point(icon: Icons.cloud_off_outlined, text: 'Everything works offline and stays on this phone'),
+            const _Point(icon: Icons.cloud_off_outlined, text: 'Everything works offline and stays on this device'),
             const SizedBox(height: 40),
             if (problem != null) ...[
               _Problem(message: problem),
@@ -64,7 +64,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             ],
             FilledButton(
               onPressed: _signingIn ? null : widget.session.startWithoutRavelry,
-              child: const Text('Start on this phone'),
+              child: const Text('Start on this device'),
             ),
             const SizedBox(height: 12),
             OutlinedButton(

@@ -233,9 +233,9 @@ class AppSession extends ChangeNotifier {
       await signOut();
       signInProblem = 'Your Ravelry sign-in ended. Please sign in again.';
     } on RavelryUnreachable {
-      syncProblem = "You're offline. Showing what's on this phone.";
+      syncProblem = "You're offline. Showing what's on this device.";
     } on RavelryError catch (error) {
-      syncProblem = 'Ravelry had a problem (${error.statusCode}). Showing what\'s on this phone.';
+      syncProblem = 'Ravelry had a problem (${error.statusCode}). Showing what\'s on this device.';
     } on SignInFailed catch (failure) {
       syncProblem = failure.message;
     } finally {
@@ -461,7 +461,7 @@ class AppSession extends ChangeNotifier {
     try {
       await files.download(file);
     } on DownloadLimitReached {
-      return 'Ravelry\'s daily download limit is reached. Try again tomorrow; files already on this phone still open.';
+      return 'Ravelry\'s daily download limit is reached. Try again tomorrow; files already on this device still open.';
     } on NeedsPdfPermission {
       return 'Allow PDF downloads first.';
     } on RavelryUnreachable {

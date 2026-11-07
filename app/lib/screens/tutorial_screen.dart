@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../layout.dart';
@@ -127,17 +129,30 @@ class _Page extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      children: [
-        const SizedBox(height: 8),
-        ExcludeSemantics(child: AspectRatio(aspectRatio: 1.1, child: picture)),
-        const SizedBox(height: 28),
-        Semantics(header: true, child: Text(title, style: text.headlineMedium)),
-        const SizedBox(height: 12),
-        Text(body, style: text.bodyLarge?.copyWith(color: PurlnoteColors.plumMuted, height: 1.45)),
-        if (extra != null) ...[const SizedBox(height: 12), extra!],
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // On a short screen, such as an iPad held sideways, the picture
+        // shrinks so the words still fit under it.
+        final pictureHeight = min((constraints.maxWidth - 48) / 1.1, constraints.maxHeight * 0.48);
+        return ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          children: [
+            const SizedBox(height: 8),
+            Center(
+              child: SizedBox(
+                height: pictureHeight,
+                width: pictureHeight * 1.1,
+                child: ExcludeSemantics(child: picture),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Semantics(header: true, child: Text(title, style: text.headlineMedium)),
+            const SizedBox(height: 12),
+            Text(body, style: text.bodyLarge?.copyWith(color: PurlnoteColors.plumMuted, height: 1.45)),
+            if (extra != null) ...[const SizedBox(height: 12), extra!],
+          ],
+        );
+      },
     );
   }
 }

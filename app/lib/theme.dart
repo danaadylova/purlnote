@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Purlnote's colors, matching the screen mockups.
 abstract final class PurlnoteColors {
@@ -94,6 +95,9 @@ ThemeData buildPurlnoteTheme() {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
+      // Dark status bar icons, also over the see-through bars of the More and
+      // Library tabs (a see-through bar would otherwise get light icons).
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
     ),
     textTheme: const TextTheme(
       headlineMedium: TextStyle(fontWeight: FontWeight.w700, color: PurlnoteColors.plum),

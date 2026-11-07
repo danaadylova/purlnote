@@ -82,7 +82,7 @@ class MoreScreen extends StatelessWidget {
                 const ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.phone_iphone),
-                  title: Text('Using Purlnote on this phone'),
+                  title: Text('Using Purlnote on this device'),
                   subtitle: Text('Your projects, PDFs, notes and counters are kept here.'),
                 ),
                 const Divider(),
@@ -188,8 +188,8 @@ class MoreScreen extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Sign out of Ravelry?'),
         content: Text(
-          'Your Ravelry projects, queue and stash are removed from this phone and come back when you sign in. '
-          'Projects kept on this phone, PDFs, notes and counters stay, and Purlnote keeps working.'
+          'Your Ravelry projects, queue and stash are removed from this device and come back when you sign in. '
+          'Projects kept on this device, PDFs, notes and counters stay, and Purlnote keeps working.'
           '${waiting == 0 ? '' : ' $waiting changes that haven\'t reached Ravelry yet will be lost.'}',
         ),
         actions: [
@@ -258,7 +258,7 @@ class _BackupSwitchState extends State<_BackupSwitch> {
       title: const Text('Back up notes to Ravelry'),
       subtitle: const Text(
         'Notes, highlights, counters and reading spots, kept privately in your Ravelry account. '
-        'PDFs and pen drawings stay on this phone.',
+        'PDFs and pen drawings stay on this device.',
       ),
       value: _enabled ?? true,
       onChanged: _enabled == null ? null : _change,

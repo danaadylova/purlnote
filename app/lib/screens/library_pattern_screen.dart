@@ -215,9 +215,9 @@ class _LibraryPatternScreenState extends State<LibraryPatternScreen> {
   }
 
   String _size(int? bytes) {
-    if (bytes == null) return 'On this phone';
+    if (bytes == null) return 'On this device';
     final mb = bytes / (1024 * 1024);
-    return mb >= 1 ? '${mb.toStringAsFixed(1)} MB · on this phone' : '${(bytes / 1024).round()} KB · on this phone';
+    return mb >= 1 ? '${mb.toStringAsFixed(1)} MB · on this device' : '${(bytes / 1024).round()} KB · on this device';
   }
 }
 
@@ -237,7 +237,7 @@ class _PermissionCard extends StatelessWidget {
         children: [
           const Text(
             'To download your purchased PDFs, allow Purlnote to fetch them from Ravelry. '
-            'Ravelry asks once. Each PDF is downloaded once and kept on this phone.',
+            'Ravelry asks once. Each PDF is downloaded once and kept on this device.',
             style: TextStyle(fontSize: 15, height: 1.4),
           ),
           const SizedBox(height: 10),
